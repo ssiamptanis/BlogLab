@@ -1,0 +1,71 @@
+<svg width="400" height="530" viewBox="0 0 400 530" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+  <!-- Ground line -->
+  <line x1="20" y1="518" x2="380" y2="518" stroke="black" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- BASKETBALL -->
+  <circle cx="312" cy="80" r="50" fill="#FF0077" stroke="black" stroke-width="4"/>
+  <line x1="312" y1="30" x2="312" y2="130" stroke="black" stroke-width="3"/>
+  <path d="M262 80 Q282 57 312 54 Q342 57 362 80" stroke="black" stroke-width="3" fill="none"/>
+  <path d="M262 80 Q282 103 312 106 Q342 103 362 80" stroke="black" stroke-width="3" fill="none"/>
+
+  <!-- LEFT ARM (balance arm — drawn before body so jersey covers shoulder join) -->
+  <path d="M140 244 Q106 265 72 286" stroke="black" stroke-width="30" stroke-linecap="round" fill="none"/>
+  <path d="M140 244 Q106 265 72 286" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
+
+  <!-- BODY / JERSEY -->
+  <path d="M138 242 C124 257 118 284 118 316 C118 352 148 374 190 374 C232 374 262 352 262 316 C262 284 256 257 242 242 C228 235 210 230 190 230 C170 230 152 235 138 242 Z" fill="#FF0077" stroke="black" stroke-width="4"/>
+
+  <!-- Jersey side stripe detail -->
+  <path d="M124 268 C120 284 118 300 118 316" stroke="white" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.5"/>
+  <path d="M256 268 C260 284 262 300 262 316" stroke="white" stroke-width="6" stroke-linecap="round" fill="none" opacity="0.5"/>
+
+  <!-- RIGHT ARM (shooting arm — drawn after body so it appears in front) -->
+  <path d="M244 244 Q278 192 308 132" stroke="black" stroke-width="30" stroke-linecap="round" fill="none"/>
+  <path d="M244 244 Q278 192 308 132" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
+
+  <!-- SHORTS -->
+  <path d="M190 372 L244 366 L252 428 L190 430 Z" fill="black"/>
+  <path d="M190 372 L136 366 L128 428 L190 430 Z" fill="black"/>
+  <path d="M130 374 L250 374" stroke="white" stroke-width="2.5" fill="none"/>
+
+  <!-- RIGHT LOWER LEG (jumping forward) -->
+  <path d="M250 428 Q265 455 275 490" stroke="black" stroke-width="30" stroke-linecap="round" fill="none"/>
+  <path d="M250 428 Q265 455 275 490" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
+
+  <!-- LEFT LOWER LEG (trailing/bent back) -->
+  <path d="M130 428 Q116 455 105 490" stroke="black" stroke-width="30" stroke-linecap="round" fill="none"/>
+  <path d="M130 416 Q116 444 105 478" stroke="white" stroke-width="20" stroke-linecap="round" fill="none"/>
+
+  <!-- RIGHT SHOE -->
+  <path d="M260 490 C268 497 280 505 298 509 C318 513 338 511 346 504 C352 497 348 489 336 484 C320 478 274 478 260 486 Z" fill="black" stroke="black" stroke-width="3"/>
+  <path d="M270 502 C284 508 316 508 344 500" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- LEFT SHOE -->
+  <path d="M94 488 C86 495 84 504 92 511 C103 518 132 518 148 511 C157 506 156 497 146 491 C132 484 100 484 94 488 Z" fill="black" stroke="black" stroke-width="3"/>
+  <path d="M94 503 C108 510 134 510 153 503" stroke="white" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+
+  <!-- NECK -->
+  <path d="M180 224 L200 224 L202 244 L178 244 Z" fill="white" stroke="black" stroke-width="4" stroke-linejoin="round"/>
+
+  <!-- HEAD -->
+  <circle cx="190" cy="182" r="44" fill="white" stroke="black" stroke-width="4"/>
+
+  <!-- HAIR -->
+  <path d="M148 172 C150 136 165 120 190 118 C215 120 230 136 232 172 C218 160 206 155 190 154 C174 155 162 160 148 172 Z" fill="black"/>
+
+  <!-- RIGHT EAR -->
+  <path d="M232 185 C243 181 247 193 238 200" stroke="black" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- EYES -->
+  <circle cx="178" cy="180" r="5.5" fill="black"/>
+  <circle cx="202" cy="180" r="5.5" fill="black"/>
+
+  <!-- EYEBROWS (focused/determined) -->
+  <path d="M167 167 L185 164" stroke="black" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M195 164 L213 167" stroke="black" stroke-width="3.5" stroke-linecap="round"/>
+
+  <!-- MOUTH (open, effort) -->
+  <path d="M180 198 Q190 207 200 198" stroke="black" stroke-width="3" stroke-linecap="round" fill="none"/>
+
+</svg>

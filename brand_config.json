@@ -1,0 +1,92 @@
+{
+  "_comment": "GWI brand config. Brand team: edit values only — do not change structure.",
+
+  "brand": {
+    "name": "GWI",
+    "tagline": "Know your audience"
+  },
+
+  "colors": {
+    "primary":       "#000000",
+    "secondary":     "#101720",
+    "accent":        "#FF0077",
+    "accent_light":  "#FF5993",
+    "accent_bg":     "#FFE8EE",
+    "background":    "#FFFFFF",
+    "surface":       "#F7FAFF",
+    "surface_mid":   "#EBF1FB",
+    "text":          "#101720",
+    "text_secondary":"#526482",
+    "text_light":    "#7989A6",
+    "text_white":    "#FFFFFF",
+    "border":        "#CED9EB",
+    "border_light":  "#DFE7F5",
+    "success":       "#008851",
+    "warning":       "#F6C26D",
+    "error":         "#DA3441",
+    "cta":           "#00FF88",
+    "violet":        "#5461C8",
+    "blue":          "#007CB6",
+    "purple":        "#963CBD",
+    "teal":          "#008291"
+  },
+
+  "typography": {
+    "heading_font":    "Faktum-Bold",
+    "subheading_font": "Faktum-SemiBold",
+    "body_font":       "Faktum-Regular",
+    "thin_font":       "Faktum-Thin",
+    "mono_font":       "Courier",
+    "sizes": {
+      "h1":      28,
+      "h2":      20,
+      "h3":      15,
+      "h4":      12,
+      "body":    10,
+      "small":    8,
+      "caption":  7
+    }
+  },
+
+  "layout": {
+    "page_size":     "CANVAS",
+    "page_width":    1200,
+    "margin_top":    40,
+    "margin_bottom": 40,
+    "margin_left":   60,
+    "margin_right":  60,
+    "header_height": 0,
+    "footer_height": 0,
+    "gutter":        16
+  },
+
+  "logo": {
+    "path":          "assets/gwi-logo.svg",
+    "path_on_dark":  "assets/gwi-logo-on-black.svg",
+    "path_mono":     "assets/gwi-logo-mono.svg",
+    "width":         143,
+    "height":        44,
+    "aspect_ratio":  3.259
+  },
+
+  "header": {
+    "show_logo":       true,
+    "show_brand_name": false,
+    "show_divider":    true,
+    "locked":          true
+  },
+
+  "footer": {
+    "show_page_numbers": true,
+    "show_brand_name":   true,
+    "show_divider":      true,
+    "custom_text":       "",
+    "locked":            true
+  },
+
+  "cover_page": {
+    "background_style":    "solid",
+    "show_decorative_bar": true,
+    "bar_height":          8
+  }
+}

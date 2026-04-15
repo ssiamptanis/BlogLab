@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ABX PDF Builder · GWI</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="update-banner" style="display:none"></div>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+  <script>
+    if (window.electronApp?.onUpdateStatus) {
+      window.electronApp.onUpdateStatus(({ type, version }) => {
+        const banner = document.getElementById('update-banner')
+        if (type === 'downloading') {
+          banner.style.display = 'flex'
+          banner.innerHTML = `<span>⬇ Downloading update v${version}…</span>`
+          banner.className = 'update-banner update-banner--downloading'
+        } else if (type === 'ready') {
+          banner.style.display = 'flex'
+          banner.innerHTML = `<span>✦ ABX PDF Builder v${version} is ready</span><button onclick="window.electronApp.installUpdate()">Restart to update</button>`
+          banner.className = 'update-banner update-banner--ready'
+        }
+      })
+    }
+  </script>
+</body>
+</html>
