@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: gwi-blog-thumbnail-creator-api
+    runtime: python
+    buildCommand: pip install -r requirements-server.txt
+    startCommand: python server.py
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: FIGMA_TOKEN
+        sync: false
