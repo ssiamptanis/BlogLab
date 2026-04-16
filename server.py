@@ -1150,18 +1150,33 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
     """
     rng = random.Random(attempt * 31337)
 
-    # ── Audiences: always a real person on plain solid background ─────────────
+    # ── Audiences: always a SINGLE person facing the camera, plain background ──
     if category == 'audiences':
-        # Rotate through portrait-style variations per attempt
-        audiences_queries = [
-            'person portrait solid color background minimal facing camera',
-            'woman man studio portrait plain background professional',
-            'close up face portrait clean simple backdrop',
-            'person looking at camera solid background minimal',
-            'professional portrait bright solid color background',
-            'headshot person simple plain studio background',
+        # Pull up to 2 short keywords from the title for demographic relevance
+        # (include short words like "gen", "z", "men" that the main extractor skips)
+        raw_title_words = [
+            w.strip('.,!?:;"\'/()').lower()
+            for w in title.replace('-', ' ').split()
+            if len(w.strip('.,!?:;"\'/()')) >= 2
+               and w.strip('.,!?:;"\'/()').lower() not in
+               {'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are'}
+        ][:2]
+
+        # Rotate through visual style variants per attempt
+        style_variants = [
+            'solid color background single person facing camera',
+            'plain backdrop studio portrait one person front view',
+            'clean simple background single individual looking at camera',
+            'bright solid background close up portrait facing forward',
+            'pastel background one person headshot front facing',
+            'minimal background individual portrait looking straight ahead',
         ]
-        return audiences_queries[attempt % len(audiences_queries)]
+        style = style_variants[attempt % len(style_variants)]
+
+        parts = raw_title_words + style.split()
+        seen = set()
+        unique = [w for w in parts if not (w in seen or seen.add(w))]
+        return ' '.join(unique[:10])
 
     # ── Gemini path (if configured) ───────────────────────────────────────────
     if GEMINI_API_KEY:
@@ -1314,7 +1329,12 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
 
 
 def _compose_image(image_url, width=1200, height=700):
-    """Download image, smart-crop to target dimensions, return base64 PNG."""
+    """Download image, smart-crop to target dimensions, return base64 PNG.
+
+    For portrait-orientation sources (taller than wide), anchors the vertical
+    crop to the top of the image — faces/heads stay in frame instead of being
+    centre-cropped out.  For landscape sources, centres horizontally as before.
+    """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
     img = Image.open(io.BytesIO(res.content)).convert('RGB')
@@ -1322,14 +1342,23 @@ def _compose_image(image_url, width=1200, height=700):
     target_ratio = width / height
     src_w, src_h = img.size
     src_ratio = src_w / src_h
+    is_portrait_src = src_h > src_w   # taller than wide → likely has a person
 
     if src_ratio > target_ratio:
+        # Source is wider than target ratio → crop width, keep full height
         new_w = int(src_h * target_ratio)
         left = (src_w - new_w) // 2
         img = img.crop((left, 0, left + new_w, src_h))
     else:
+        # Source is narrower than target ratio → crop height
         new_h = int(src_w / target_ratio)
-        top = (src_h - new_h) // 2
+        if is_portrait_src:
+            # Anchor to top: 5% breathing room above the face, never out of bounds
+            top = min(int(src_h * 0.05), src_h - new_h)
+            top = max(0, top)
+        else:
+            # Landscape/square source: centre crop is safe
+            top = (src_h - new_h) // 2
         img = img.crop((0, top, src_w, top + new_h))
 
     img = img.resize((width, height), Image.LANCZOS)
