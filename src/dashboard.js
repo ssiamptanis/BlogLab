@@ -1035,7 +1035,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           name:          blogMeta.title,
           status:        'saved',
           folder_id:     null,
-          template_type: 'blog-thumbnail',
+          template_type: 'blog-thumbnail', // ensure this value is in the DB check constraint
           doc:           { imageUrl: sourceImageUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
           block_count:   0,
           block_types:   [],
@@ -1052,7 +1052,6 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         doc_author:        user.name      || '',
         doc_author_avatar: user.avatarUrl || '',
       })
-      _templates_cache_invalidate?.()
       refreshGrid()
       showToast(`"${blogMeta.title}" saved to dashboard`)
     } catch (err) {
