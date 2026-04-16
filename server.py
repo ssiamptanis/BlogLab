@@ -1281,9 +1281,23 @@ def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
     if exclude_ids:
         photos = [p for p in photos if str(p['id']) not in exclude_ids]
 
-    # Shuffle within results for additional variety per attempt
-    rng = random.Random(attempt * 999)
-    rng.shuffle(photos)
+    # For portrait/audiences queries: filter out full-body shots (very tall, narrow images)
+    # and prefer images closer to square (more likely to be busts/headshots).
+    # A headshot or bust typically has width/height ≥ 0.55; a full-body shot is often < 0.5.
+    if is_portrait_query and photos:
+        headshot_photos = [p for p in photos if (p['width'] / p['height']) >= 0.55]
+        # If filtering leaves too few, keep what we have rather than returning nothing
+        if len(headshot_photos) >= count:
+            photos = headshot_photos
+        elif headshot_photos:
+            photos = headshot_photos
+        # Sort by aspect ratio descending — closest to square first (best for bust shots)
+        photos.sort(key=lambda p: p['width'] / p['height'], reverse=True)
+    else:
+        # Shuffle within results for additional variety per attempt
+        rng = random.Random(attempt * 999)
+        rng.shuffle(photos)
+
     selected = photos[:count]
     return [{'id': str(p['id']), 'url': p['src']['large2x'], 'preview': p['src']['large'],
              'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
@@ -1406,9 +1420,9 @@ def _compose_image(image_url, width=1200, height=700):
             # Build a crop that shows the face plus generous shoulder/chest room.
             # Expand the face box: 30% above for forehead/hair, 200% below for
             # shoulders, horizontally centred with 60% padding each side.
-            pad_top    = int(fh * 0.30)
-            pad_bottom = int(fh * 2.00)   # room for shoulders + chest
-            pad_side   = int(fw * 0.60)
+            pad_top    = int(fh * 0.40)    # forehead + hair
+            pad_bottom = int(fh * 1.20)    # just enough for shoulders
+            pad_side   = int(fw * 0.80)    # a bit wider for natural framing
 
             crop_y1 = max(0, fy - pad_top)
             crop_y2 = min(src_h, fy + fh + pad_bottom)
@@ -1441,9 +1455,10 @@ def _compose_image(image_url, width=1200, height=700):
             print(f'[face-crop] crop=({x1},{y1},{x2},{y2})', flush=True)
 
         else:
-            # ── No face detected: fall back to top-35% crop ──────────────────
-            print('[face-crop] no face found, using top-35% fallback', flush=True)
-            crop_h = int(src_h * 0.35)
+            # ── No face detected: fall back to aggressive top-20% crop ───────
+            # 20% of a portrait image = ~head and neck zone; avoids showing body
+            print('[face-crop] no face found, using top-20% fallback', flush=True)
+            crop_h = int(src_h * 0.20)
             crop_w = int(crop_h * target_ratio)
             crop_w = min(crop_w, src_w)
             left   = (src_w - crop_w) // 2
