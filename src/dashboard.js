@@ -686,9 +686,43 @@ async function _fetchIllustrationUrl() {
   return ''
 }
 
-function showBlogThumbnailForm() {
+// ── CSV parser ────────────────────────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''))
+  const col = key => headers.findIndex(h => h.includes(key))
+  const iTitle    = col('title')
+  const iMeta     = col('meta')
+  const iSubs     = col('sub')
+  const iCategory = col('cat')
+  return lines.slice(1).map(line => {
+    // Handle quoted fields
+    const fields = []
+    let cur = '', inQ = false
+    for (const ch of line) {
+      if (ch === '"') { inQ = !inQ }
+      else if (ch === ',' && !inQ) { fields.push(cur.trim()); cur = '' }
+      else cur += ch
+    }
+    fields.push(cur.trim())
+    return {
+      title:     iTitle    >= 0 ? (fields[iTitle]    || '') : '',
+      metaDesc:  iMeta     >= 0 ? (fields[iMeta]     || '') : '',
+      subtitles: iSubs     >= 0 ? (fields[iSubs]     || '') : '',
+      category:  iCategory >= 0 ? (fields[iCategory] || '') : '',
+    }
+  }).filter(r => r.title)
+}
+
+// ── Blog thumbnail form ───────────────────────────────────────────────────────
+function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   _mount.querySelector('.blog-form-overlay')?.remove()
+
+  const isBulk    = csvRows && csvRows.length > 1
+  const prefill   = csvRows ? csvRows[currentIndex] : null
+  const progress  = isBulk ? `<div class="blog-form-progress">Thumbnail ${currentIndex + 1} of ${csvRows.length}</div>` : ''
 
   const overlay = document.createElement('div')
   overlay.className = 'blog-form-overlay tmpl-picker-overlay'
@@ -697,38 +731,55 @@ function showBlogThumbnailForm() {
       <div class="tmpl-picker-header">
         <div>
           <h2 class="tmpl-picker-title">Blog thumbnail details</h2>
-          <p class="tmpl-picker-subtitle">Fill in the details below to get started</p>
+          <p class="tmpl-picker-subtitle">${isBulk ? `Reviewing CSV row ${currentIndex + 1} of ${csvRows.length} — edit before generating` : 'Fill in the details or upload a CSV for multiple thumbnails'}</p>
         </div>
         <button class="tmpl-picker-close" id="blog-form-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
 
+      ${progress}
+
       <form class="blog-form" id="blog-thumbnail-form" autocomplete="off">
         <div class="blog-form-field">
           <label class="blog-form-label" for="blog-title">Blog title <span class="blog-form-required">*</span></label>
-          <input class="blog-form-input" id="blog-title" type="text" placeholder="e.g. The state of social media in 2025" required />
+          <input class="blog-form-input" id="blog-title" type="text" value="${(prefill?.title || '').replace(/"/g, '&quot;')}" placeholder="e.g. The state of social media in 2025" required />
         </div>
 
         <div class="blog-form-field">
           <label class="blog-form-label" for="blog-meta">Meta description</label>
           <textarea class="blog-form-input blog-form-textarea" id="blog-meta" rows="4"
-            placeholder="e.g. A look at how audiences across markets are engaging with social platforms this year…"></textarea>
+            placeholder="e.g. A look at how audiences across markets are engaging with social platforms this year…">${prefill?.metaDesc || ''}</textarea>
         </div>
 
         <div class="blog-form-field">
           <label class="blog-form-label" for="blog-subtitles">Body subtitles <span class="blog-form-hint">(optional — one per line)</span></label>
           <textarea class="blog-form-input blog-form-textarea" id="blog-subtitles" rows="3"
-            placeholder="e.g.\nWhy TikTok still leads\nInstagram's resurgence\nWhat B2B audiences want"></textarea>
+            placeholder="e.g. Why TikTok still leads">${prefill?.subtitles || ''}</textarea>
         </div>
 
         <div class="blog-form-field">
-          <label class="blog-form-label" for="blog-category">Category</label>
-          <input class="blog-form-input" id="blog-category" type="text" placeholder="e.g. Social Media, Consumer Trends, Technology" />
+          <label class="blog-form-label" for="blog-category">
+            Category <span class="blog-form-hint">(Audiences, Consumer behaviour, Digital trends, Data journalism, Talk data to me, Product, Strategy)</span>
+          </label>
+          <input class="blog-form-input" id="blog-category" type="text" value="${(prefill?.category || '').replace(/"/g, '&quot;')}" placeholder="e.g. Digital trends" />
         </div>
 
+        ${!isBulk ? `
+        <div class="blog-form-csv-row">
+          <span class="blog-form-csv-label">Or create multiple thumbnails from a CSV file</span>
+          <label class="blog-form-csv-btn">
+            ${lucideSVG('upload', 14, 'currentColor')} Upload CSV
+            <input type="file" id="blog-csv-input" accept=".csv" style="display:none" />
+          </label>
+          <a class="blog-form-csv-template" id="blog-csv-download" href="#">Download template</a>
+        </div>
+        ` : ''}
+
+        <div class="blog-form-error" id="blog-form-error" style="display:none"></div>
+
         <div class="blog-form-actions">
-          <button type="button" class="blog-form-cancel" id="blog-form-cancel">Cancel</button>
-          <button type="submit" class="blog-form-submit">
-            Create thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
+          <button type="button" class="blog-form-cancel" id="blog-form-cancel">${isBulk ? 'Cancel batch' : 'Cancel'}</button>
+          <button type="submit" class="blog-form-submit" id="blog-form-submit">
+            Generate thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
           </button>
         </div>
       </form>
@@ -743,6 +794,33 @@ function showBlogThumbnailForm() {
   overlay.querySelector('#blog-form-cancel').addEventListener('click', close)
   overlay.addEventListener('click', e => { if (e.target === overlay) close() })
 
+  // CSV template download
+  overlay.querySelector('#blog-csv-download')?.addEventListener('click', e => {
+    e.preventDefault()
+    const csv = 'title,meta_description,subtitles,category\n"My blog title","Meta description here","Subtitle one\nSubtitle two","Digital trends"'
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'thumbnail-template.csv' })
+    a.click()
+  })
+
+  // CSV upload
+  overlay.querySelector('#blog-csv-input')?.addEventListener('change', e => {
+    const file = e.target.files[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const rows = parseCSV(ev.target.result)
+      if (!rows.length) {
+        showBlogFormError(overlay, 'CSV has no valid rows. Make sure it has a header row with: title, meta_description, subtitles, category')
+        return
+      }
+      overlay.remove()
+      showBlogThumbnailForm(rows, 0)
+    }
+    reader.readAsText(file)
+  })
+
+  // Form submit
   overlay.querySelector('#blog-thumbnail-form').addEventListener('submit', async e => {
     e.preventDefault()
     const blogMeta = {
@@ -751,9 +829,233 @@ function showBlogThumbnailForm() {
       subtitles: overlay.querySelector('#blog-subtitles').value.trim(),
       category:  overlay.querySelector('#blog-category').value.trim(),
     }
-    overlay.remove()
-    await onNewTemplate('blog-thumbnail', blogMeta)
+    if (!blogMeta.title) return
+    const btn = overlay.querySelector('#blog-form-submit')
+    btn.disabled = true
+    btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Generating…`
+    hideFormError(overlay)
+
+    try {
+      const result = await apiFetch('/api/thumbnail/generate', {
+        method: 'POST',
+        body: JSON.stringify(blogMeta)
+      })
+      if (!result.ok && result.error) throw new Error(result.error)
+      overlay.remove()
+      showThumbnailPicker(blogMeta, result, csvRows, currentIndex)
+    } catch (err) {
+      showBlogFormError(overlay, err.message || 'Generation failed — try again')
+      btn.disabled = false
+      btn.innerHTML = `Generate thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}`
+    }
   })
+}
+
+function showBlogFormError(overlay, msg) {
+  const el = overlay.querySelector('#blog-form-error')
+  if (!el) return
+  el.textContent = msg
+  el.style.display = 'block'
+}
+function hideFormError(overlay) {
+  const el = overlay.querySelector('#blog-form-error')
+  if (el) el.style.display = 'none'
+}
+
+// ── Thumbnail image picker ────────────────────────────────────────────────────
+function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0) {
+  if (result.type === 'talk-data') {
+    showTalkDataForm(blogMeta, csvRows, currentIndex)
+    return
+  }
+
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const isBulk = csvRows && csvRows.length > 1
+  const usedIds = []
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal thumb-picker-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Choose your thumbnail</h2>
+          <p class="tmpl-picker-subtitle">${blogMeta.title}${isBulk ? ` — ${currentIndex + 1} of ${csvRows.length}` : ''}</p>
+        </div>
+        <button class="tmpl-picker-close" id="thumb-picker-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+
+      <div class="thumb-picker-grid" id="thumb-picker-grid">
+        ${result.options.map((opt, i) => `
+          <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
+            <img class="thumb-picker-img" src="${opt.preview || opt.url}" alt="Option ${i + 1}" loading="lazy" />
+            <div class="thumb-picker-label">Option ${i + 1}</div>
+          </button>
+        `).join('')}
+      </div>
+
+      <div class="blog-form-error" id="thumb-picker-error" style="display:none"></div>
+
+      <div class="thumb-picker-actions">
+        <button class="blog-form-cancel" id="thumb-try-again">${lucideSVG('refresh-cw', 14, 'currentColor')} Try again</button>
+        <span class="thumb-picker-hint">Select an image to compose your thumbnail</span>
+      </div>
+    </div>
+  `
+
+  _mount.appendChild(overlay)
+  overlay.querySelector('#thumb-picker-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+
+  // Try again — re-call generate with used IDs excluded
+  overlay.querySelector('#thumb-try-again').addEventListener('click', async () => {
+    const btn = overlay.querySelector('#thumb-try-again')
+    btn.disabled = true
+    btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Fetching…`
+    try {
+      const newResult = await apiFetch('/api/thumbnail/generate', {
+        method: 'POST',
+        body: JSON.stringify({ ...blogMeta, excludeIds: result.options.map(o => o.id) })
+      })
+      overlay.remove()
+      showThumbnailPicker(blogMeta, newResult, csvRows, currentIndex)
+    } catch (err) {
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('refresh-cw', 14, 'currentColor')} Try again`
+      const errEl = overlay.querySelector('#thumb-picker-error')
+      errEl.textContent = err.message || 'Failed to fetch new options'
+      errEl.style.display = 'block'
+    }
+  })
+
+  // Select image → compose
+  overlay.querySelectorAll('.thumb-picker-card').forEach(card => {
+    card.addEventListener('click', async () => {
+      overlay.querySelectorAll('.thumb-picker-card').forEach(c => c.classList.remove('selected'))
+      card.classList.add('selected')
+      card.innerHTML = `<span class="page-spinner" style="width:24px;height:24px;border-width:3px"></span>`
+
+      try {
+        const res = await apiFetch('/api/thumbnail/compose', {
+          method: 'POST',
+          body: JSON.stringify({ imageUrl: card.dataset.url })
+        })
+        overlay.remove()
+        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex)
+      } catch (err) {
+        const errEl = overlay.querySelector('#thumb-picker-error')
+        errEl.textContent = 'Failed to compose image — try another'
+        errEl.style.display = 'block'
+        overlay.querySelectorAll('.thumb-picker-card').forEach(c => c.classList.remove('selected'))
+      }
+    })
+  })
+}
+
+// ── Thumbnail result (download + next) ───────────────────────────────────────
+function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0) {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const isBulk    = csvRows && csvRows.length > 1
+  const hasNext   = isBulk && currentIndex < csvRows.length - 1
+  const safeTitle = blogMeta.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal thumb-result-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Your thumbnail is ready</h2>
+          <p class="tmpl-picker-subtitle">${blogMeta.title}${isBulk ? ` — ${currentIndex + 1} of ${csvRows.length}` : ''}</p>
+        </div>
+        <button class="tmpl-picker-close" id="thumb-result-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="thumb-result-preview">
+        <img src="${imageDataUrl}" alt="Thumbnail" class="thumb-result-img" />
+      </div>
+      <div class="thumb-picker-actions">
+        <button class="blog-form-cancel" id="thumb-result-back">${lucideSVG('arrow-left', 14, 'currentColor')} Choose different</button>
+        <div style="display:flex;gap:10px">
+          <a class="blog-form-submit" id="thumb-result-download" href="${imageDataUrl}" download="${safeTitle}_thumbnail.png">
+            ${lucideSVG('download', 14, 'currentColor')} Download PNG
+          </a>
+          ${hasNext ? `<button class="blog-form-submit" id="thumb-result-next" style="background:#1E3A5F">
+            Next thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
+          </button>` : ''}
+        </div>
+      </div>
+    </div>
+  `
+
+  _mount.appendChild(overlay)
+  overlay.querySelector('#thumb-result-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+
+  overlay.querySelector('#thumb-result-back').addEventListener('click', () => {
+    overlay.remove()
+    // Re-generate options for this same row
+    apiFetch('/api/thumbnail/generate', {
+      method: 'POST', body: JSON.stringify(blogMeta)
+    }).then(result => showThumbnailPicker(blogMeta, result, csvRows, currentIndex))
+      .catch(() => showBlogThumbnailForm(csvRows, currentIndex))
+  })
+
+  overlay.querySelector('#thumb-result-next')?.addEventListener('click', () => {
+    overlay.remove()
+    showBlogThumbnailForm(csvRows, currentIndex + 1)
+  })
+}
+
+// ── Talk data to me placeholder ───────────────────────────────────────────────
+function showTalkDataForm(blogMeta, csvRows, currentIndex) {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal blog-form-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Talk data to me</h2>
+          <p class="tmpl-picker-subtitle">Upload the assets needed to build your thumbnail</p>
+        </div>
+        <button class="tmpl-picker-close" id="talk-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="blog-form" style="gap:16px">
+        <p style="color:#94A3B8;font-size:14px;line-height:1.6">
+          The <strong style="color:#E2E8F0">Talk data to me</strong> thumbnail requires a photo of a person (looking at the camera) and a company logo. The background will be black or pink.
+        </p>
+        <div class="blog-form-field">
+          <label class="blog-form-label">Person photo</label>
+          <input class="blog-form-input" id="talk-person" type="file" accept="image/*" style="padding:8px" />
+        </div>
+        <div class="blog-form-field">
+          <label class="blog-form-label">Company logo</label>
+          <input class="blog-form-input" id="talk-logo" type="file" accept="image/*" style="padding:8px" />
+        </div>
+        <div class="blog-form-field">
+          <label class="blog-form-label">Background colour</label>
+          <div style="display:flex;gap:12px;margin-top:4px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#E2E8F0;font-size:14px">
+              <input type="radio" name="talk-bg" value="black" checked /> Black
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#E2E8F0;font-size:14px">
+              <input type="radio" name="talk-bg" value="pink" /> Pink (#FF0077)
+            </label>
+          </div>
+        </div>
+        <div class="blog-form-actions" style="margin-top:8px">
+          <button class="blog-form-cancel" id="talk-cancel">Cancel</button>
+          <button class="blog-form-submit" disabled style="opacity:0.5;cursor:not-allowed">
+            ${lucideSVG('clock', 14, 'currentColor')} Coming soon
+          </button>
+        </div>
+      </div>
+    </div>
+  `
+  _mount.appendChild(overlay)
+  overlay.querySelector('#talk-close').addEventListener('click', () => overlay.remove())
+  overlay.querySelector('#talk-cancel').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
 }
 
 async function onNewTemplate(typeId = 'blog-thumbnail', blogMeta = null) {

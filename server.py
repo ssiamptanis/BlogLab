@@ -1092,6 +1092,219 @@ def test_figma():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 
+# ── Thumbnail generation pipeline ─────────────────────────────────────────────
+
+import io
+import random
+import base64
+from PIL import Image
+
+VALID_CATEGORIES = {
+    'audiences', 'consumer behaviour', 'digital trends',
+    'data journalism', 'talk data to me', 'product', 'strategy'
+}
+PEXELS_CATEGORIES  = {'audiences', 'consumer behaviour', 'digital trends', 'data journalism'}
+FIGMA_CATEGORIES   = {'strategy', 'product'}
+SPECIAL_CATEGORIES = {'talk data to me'}
+
+PEXELS_API_KEY            = os.environ.get('PEXELS_API_KEY', '')
+FIGMA_TOKEN_KEY           = os.environ.get('FIGMA_TOKEN', '')
+GEMINI_API_KEY            = os.environ.get('GEMINI_API_KEY', '')
+FIGMA_THUMBNAILS_FILE_KEY = '0b47ipE59eoQ72I7ceHkPd'
+
+# Cache Figma file structure so we don't refetch on every request
+_figma_pages_cache = {}
+
+
+def _build_search_query(title, meta_desc, subtitles, category):
+    """Build a Pexels search query. Uses Gemini if available, otherwise keyword extraction."""
+    if GEMINI_API_KEY:
+        try:
+            import json as _json
+            prompt = (
+                f"You are helping select a stock photo for a blog thumbnail.\n"
+                f"Blog title: {title}\n"
+                f"Category: {category}\n"
+                f"Meta description: {meta_desc or 'N/A'}\n"
+                f"Subtitles: {subtitles or 'N/A'}\n\n"
+                f"Return a JSON object with one key 'query' containing 5-8 keywords "
+                f"for searching Pexels stock photos that visually represent this blog. "
+                f"Focus on concrete visual subjects, not abstract concepts.\n"
+                f"Example: {{\"query\": \"professional woman laptop office technology\"}}"
+            )
+            res = _requests.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
+                json={"contents": [{"parts": [{"text": prompt}]}]},
+                timeout=10
+            )
+            text = res.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            if '```' in text:
+                text = text.split('```')[1]
+                if text.startswith('json'):
+                    text = text[4:]
+            return _json.loads(text.strip())['query']
+        except Exception:
+            pass  # Fall through to keyword extraction
+
+    # Fallback: keyword extraction from inputs
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+                  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'be', 'this', 'that',
+                  'how', 'why', 'what', 'why', 'its', 'it', 'as', 'into'}
+    parts = [title, category, subtitles or '', meta_desc or '']
+    words = []
+    for part in parts:
+        for w in part.replace(',', ' ').replace('-', ' ').split():
+            w = w.strip('.,!?:;"\'/()').lower()
+            if w and w not in stop_words and len(w) > 2:
+                words.append(w)
+    # Deduplicate preserving order, take top 8
+    seen = set()
+    unique = [w for w in words if not (w in seen or seen.add(w))]
+    return ' '.join(unique[:8])
+
+
+def _search_pexels(query, count=3, exclude_ids=None):
+    """Search Pexels and return image options."""
+    res = _requests.get(
+        'https://api.pexels.com/v1/search',
+        headers={'Authorization': PEXELS_API_KEY},
+        params={'query': query, 'per_page': 20, 'orientation': 'landscape'},
+        timeout=10
+    )
+    photos = res.json().get('photos', [])
+    if exclude_ids:
+        photos = [p for p in photos if str(p['id']) not in exclude_ids]
+    selected = photos[:count]
+    return [{'id': str(p['id']), 'url': p['src']['large2x'], 'preview': p['src']['large'],
+             'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
+
+
+def _get_figma_frames(page_name, count=3, exclude_ids=None):
+    """Fetch random frames from a named Figma page, with caching."""
+    global _figma_pages_cache
+    headers = {'X-Figma-Token': FIGMA_TOKEN_KEY}
+
+    if page_name not in _figma_pages_cache:
+        res = _requests.get(
+            f'https://api.figma.com/v1/files/{FIGMA_THUMBNAILS_FILE_KEY}',
+            headers=headers, timeout=20
+        )
+        data = res.json()
+        pages = data.get('document', {}).get('children', [])
+        for page in pages:
+            _figma_pages_cache[page['name']] = [
+                {'id': c['id'], 'name': c['name']}
+                for c in page.get('children', [])
+                if c.get('type') == 'FRAME'
+            ]
+
+    frames = _figma_pages_cache.get(page_name, [])
+    if exclude_ids:
+        frames = [f for f in frames if f['id'] not in exclude_ids]
+    if not frames:
+        raise ValueError(f"No frames available in Figma page '{page_name}'")
+
+    selected = random.sample(frames, min(count, len(frames)))
+    node_ids = ','.join(f['id'] for f in selected)
+
+    img_res = _requests.get(
+        f'https://api.figma.com/v1/images/{FIGMA_THUMBNAILS_FILE_KEY}',
+        headers=headers,
+        params={'ids': node_ids, 'format': 'png', 'scale': 2},
+        timeout=20
+    )
+    images = img_res.json().get('images', {})
+    return [{'id': f['id'], 'name': f['name'], 'url': images.get(f['id'], ''),
+             'preview': images.get(f['id'], ''), 'source': 'figma'}
+            for f in selected if images.get(f['id'])]
+
+
+def _compose_image(image_url, width=1200, height=700):
+    """Download image, smart-crop to target dimensions, return base64 PNG."""
+    res = _requests.get(image_url, timeout=20)
+    res.raise_for_status()
+    img = Image.open(io.BytesIO(res.content)).convert('RGB')
+
+    target_ratio = width / height
+    src_w, src_h = img.size
+    src_ratio = src_w / src_h
+
+    if src_ratio > target_ratio:
+        new_w = int(src_h * target_ratio)
+        left = (src_w - new_w) // 2
+        img = img.crop((left, 0, left + new_w, src_h))
+    else:
+        new_h = int(src_w / target_ratio)
+        top = (src_h - new_h) // 2
+        img = img.crop((0, top, src_w, top + new_h))
+
+    img = img.resize((width, height), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format='PNG', optimize=True)
+    buf.seek(0)
+    return base64.b64encode(buf.read()).decode('utf-8')
+
+
+@app.route('/api/thumbnail/generate', methods=['POST'])
+@require_auth
+def generate_thumbnail_options():
+    data       = request.get_json(force=True)
+    title      = data.get('title', '').strip()
+    meta_desc  = data.get('metaDesc', '').strip()
+    subtitles  = data.get('subtitles', '').strip()
+    category   = data.get('category', '').strip().lower()
+    exclude_ids = data.get('excludeIds', [])
+
+    if not title:
+        return jsonify({'error': 'Title is required'}), 400
+
+    if category not in VALID_CATEGORIES:
+        valid = ', '.join(c.title() for c in sorted(VALID_CATEGORIES))
+        return jsonify({'error': f'Invalid category. Must be one of: {valid}'}), 400
+
+    # Talk data to me — special flow requiring user uploads
+    if category == 'talk data to me':
+        return jsonify({'type': 'talk-data', 'category': category})
+
+    # Build search query
+    query = _build_search_query(title, meta_desc, subtitles, category)
+
+    # Pexels categories
+    if category in PEXELS_CATEGORIES:
+        try:
+            options = _search_pexels(query, count=3, exclude_ids=exclude_ids)
+            return jsonify({'type': 'pexels', 'category': category,
+                            'search_query': query, 'options': options})
+        except Exception as e:
+            return jsonify({'error': f'Pexels search failed: {e}'}), 500
+
+    # Figma categories
+    if category in FIGMA_CATEGORIES:
+        page_name = 'Strategy' if category == 'strategy' else 'Product'
+        try:
+            options = _get_figma_frames(page_name, count=3, exclude_ids=exclude_ids)
+            return jsonify({'type': 'figma', 'category': category,
+                            'search_query': query, 'options': options})
+        except Exception as e:
+            return jsonify({'error': f'Figma fetch failed: {e}'}), 500
+
+    return jsonify({'error': 'Unhandled category'}), 500
+
+
+@app.route('/api/thumbnail/compose', methods=['POST'])
+@require_auth
+def compose_thumbnail():
+    data      = request.get_json(force=True)
+    image_url = data.get('imageUrl', '').strip()
+    if not image_url:
+        return jsonify({'error': 'imageUrl is required'}), 400
+    try:
+        b64 = _compose_image(image_url)
+        return jsonify({'ok': True, 'image': f'data:image/png;base64,{b64}'})
+    except Exception as e:
+        return jsonify({'error': f'Compose failed: {e}'}), 500
+
+
 if __name__ == "__main__":
     # Railway sets PORT; fallback to FLASK_PORT for local dev
     port = int(os.environ.get("PORT", os.environ.get("FLASK_PORT", 5001)))
