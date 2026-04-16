@@ -309,6 +309,7 @@ def list_templates():
         doc = t.pop("doc", None) or {}
         t["doc_author"]        = doc.get("docAuthor", "")
         t["doc_author_avatar"] = doc.get("docAuthorAvatar", "")
+        t["doc_image_url"]     = doc.get("imageUrl", "")
         templates.append(t)
     data = {"templates": templates, "folders": folders_res.data}
     _templates_cache_set(g.user_id, data)
@@ -1349,6 +1350,65 @@ def compose_thumbnail():
         return jsonify({'ok': True, 'image': f'data:image/png;base64,{b64}'})
     except Exception as e:
         return jsonify({'error': f'Compose failed: {e}'}), 500
+
+
+@app.route('/api/thumbnail/save', methods=['POST'])
+@require_auth
+def save_thumbnail():
+    """Save a composed thumbnail PNG to Supabase Storage and create a template record."""
+    data       = request.get_json(force=True)
+    title      = (data.get('title') or 'Untitled').strip()
+    image_data = (data.get('imageData') or '').strip()
+    blog_meta  = data.get('blogMeta') or {}
+
+    if not image_data:
+        return jsonify({'error': 'imageData is required'}), 400
+
+    # Strip data URL prefix
+    if ',' in image_data:
+        image_data = image_data.split(',', 1)[1]
+
+    try:
+        png_bytes = base64.b64decode(image_data)
+    except Exception:
+        return jsonify({'error': 'Invalid base64 image data'}), 400
+
+    # Build safe filename from blog title
+    safe_title = ''.join(c if c.isalnum() or c in '-_ ' else '_' for c in title).strip().replace(' ', '_')[:60]
+    ts = int(time.time())
+    storage_path = f"thumbnails/{g.user_id}/{ts}_{safe_title}.png"
+
+    try:
+        _sb.storage.from_("abx-images").upload(
+            path=storage_path,
+            file=png_bytes,
+            file_options={"content-type": "image/png", "upsert": "true"},
+        )
+        url_res    = _sb.storage.from_("abx-images").create_signed_url(storage_path, 60 * 60 * 24 * 365)
+        signed_url = _signed_url(url_res)
+    except Exception as e:
+        return jsonify({'error': f'Storage upload failed: {e}'}), 500
+
+    # Create template record so it appears on the dashboard
+    try:
+        sb = _sb_user()
+        res = sb.table("templates").insert({
+            "user_id":       g.user_id,
+            "name":          title,
+            "status":        "saved",
+            "folder_id":     None,
+            "template_type": "blog-thumbnail",
+            "doc":           {"imageUrl": signed_url, "blogMeta": blog_meta},
+            "block_count":   0,
+            "block_types":   [],
+        }).execute()
+        _templates_cache_invalidate(g.user_id)
+        record = res.data[0]
+        # Attach doc_image_url so dashboard can render the card immediately
+        record["doc_image_url"] = signed_url
+        return jsonify({'ok': True, 'template': record}), 201
+    except Exception as e:
+        return jsonify({'error': f'Template save failed: {e}'}), 500
 
 
 if __name__ == "__main__":

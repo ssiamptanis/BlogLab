@@ -137,19 +137,23 @@ function cardHTML(t) {
   const folder = t.folder_id ? getFolderName(t.folder_id) : null
   const statusClass = t.status === 'saved' ? 'tmpl-status-saved' : 'tmpl-status-draft'
   const statusLabel = t.status === 'saved' ? 'Saved' : 'Draft'
-  const typeLabel = inferTemplateTypeLabel(t.block_types)
+  const isBlogThumb = t.template_type === 'blog-thumbnail'
+  const typeLabel = isBlogThumb ? 'Blog Thumbnail' : inferTemplateTypeLabel(t.block_types)
   const mine = isOwner(t)
   // Fall back to current user's profile for older docs that predate author stamping
   const authorName   = t.doc_author        || (!mine ? '' : _dashUser?.name      || '')
   const authorAvatar = t.doc_author_avatar  || (!mine ? '' : _dashUser?.avatarUrl || '')
   const authorHTML = _authorAvatarHTML(authorName, authorAvatar)
+  // Blog thumbnails use the stored image URL; regular templates use the base64 thumb
+  const thumbHTML = isBlogThumb && t.doc_image_url
+    ? `<img class="tmpl-card-thumb-img" src="${escHtml(t.doc_image_url)}" alt="" draggable="false" />`
+    : t.thumb
+      ? `<img class="tmpl-card-thumb-img" src="data:image/jpeg;base64,${t.thumb}" alt="" draggable="false" />`
+      : `<div class="tmpl-mini-preview">${miniPreviewHTML()}</div>`
   return `
-    <div class="tmpl-card${mine ? '' : ' tmpl-card--others'}" data-id="${t.id}" draggable="${mine}">
+    <div class="tmpl-card${mine ? '' : ' tmpl-card--others'}" data-id="${t.id}" data-type="${t.template_type || ''}" draggable="${mine}">
       <div class="tmpl-card-thumb">
-        ${t.thumb
-          ? `<img class="tmpl-card-thumb-img" src="data:image/jpeg;base64,${t.thumb}" alt="" draggable="false" />`
-          : `<div class="tmpl-mini-preview">${miniPreviewHTML()}</div>`
-        }
+        ${thumbHTML}
         <span class="tmpl-status-badge ${statusClass} tmpl-status-thumb">${statusLabel}</span>
         ${typeLabel ? `<div class="tmpl-card-type-badge">${typeLabel}</div>` : ''}
         ${!mine ? `<div class="tmpl-card-viewonly-badge">${lucideSVG('eye', 10, 'currentColor')} View only</div>` : ''}
@@ -978,9 +982,9 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
       <div class="thumb-picker-actions">
         <button class="blog-form-cancel" id="thumb-result-back">${lucideSVG('arrow-left', 14, 'currentColor')} Choose different</button>
         <div style="display:flex;gap:10px">
-          <a class="blog-form-submit" id="thumb-result-download" href="${imageDataUrl}" download="${safeTitle}_thumbnail.png">
+          <button class="blog-form-submit" id="thumb-result-download">
             ${lucideSVG('download', 14, 'currentColor')} Download PNG
-          </a>
+          </button>
           ${hasNext ? `<button class="blog-form-submit" id="thumb-result-next" style="background:#1E3A5F">
             Next thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
           </button>` : ''}
@@ -1000,6 +1004,42 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
       method: 'POST', body: JSON.stringify(blogMeta)
     }).then(result => showThumbnailPicker(blogMeta, result, csvRows, currentIndex))
       .catch(() => showBlogThumbnailForm(csvRows, currentIndex))
+  })
+
+  overlay.querySelector('#thumb-result-download').addEventListener('click', async (e) => {
+    const btn = e.currentTarget
+    btn.disabled = true
+    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Saving…`
+
+    // Save to dashboard + trigger browser download
+    try {
+      const saved = await apiFetch('/api/thumbnail/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: blogMeta.title, imageData: imageDataUrl, blogMeta })
+      })
+      // Add to dashboard cards immediately
+      if (saved.template) {
+        _templates.unshift({
+          ...saved.template,
+          doc_author:        _dashUser?.name      || '',
+          doc_author_avatar: _dashUser?.avatarUrl || '',
+        })
+        refreshGrid()
+      }
+      showToast(`"${blogMeta.title}" saved to dashboard`)
+    } catch (err) {
+      showToast('Could not save to dashboard — check connection', 'error')
+    }
+
+    // Trigger download regardless of save result
+    const a = document.createElement('a')
+    a.href     = imageDataUrl
+    a.download = `${safeTitle}_thumbnail.png`
+    a.click()
+
+    btn.disabled = false
+    btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
   })
 
   overlay.querySelector('#thumb-result-next')?.addEventListener('click', () => {
@@ -1396,8 +1436,55 @@ function onCardOpen(e) {
   if (!card) return
   if (e.target.closest('.tmpl-card-actions')) return
   if (e.target.closest('.tmpl-rename-input')) return
-  const id = card.dataset.id
-  if (id) _navigate(`/editor/${id}`)
+  const id   = card.dataset.id
+  const type = card.dataset.type
+  if (!id) return
+
+  // Blog thumbnails open a download dialog — they have no editor page
+  if (type === 'blog-thumbnail') {
+    const tmpl = _templates.find(t => t.id === id)
+    if (!tmpl) return
+    _showBlogThumbnailCardDialog(tmpl)
+    return
+  }
+
+  _navigate(`/editor/${id}`)
+}
+
+function _showBlogThumbnailCardDialog(tmpl) {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const imageUrl  = tmpl.doc_image_url || ''
+  const safeTitle = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal thumb-result-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">${escHtml(tmpl.name)}</h2>
+          <p class="tmpl-picker-subtitle">Blog Thumbnail · ${formatDate(tmpl.updated_at)}</p>
+        </div>
+        <button class="tmpl-picker-close" id="thumb-card-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="thumb-result-preview">
+        ${imageUrl
+          ? `<img src="${escHtml(imageUrl)}" alt="Thumbnail" class="thumb-result-img" />`
+          : `<div style="display:flex;align-items:center;justify-content:center;height:200px;color:#64748B">No preview available</div>`}
+      </div>
+      <div class="thumb-picker-actions">
+        <button class="blog-form-cancel" id="thumb-card-close2">${lucideSVG('x', 14, 'currentColor')} Close</button>
+        ${imageUrl ? `
+          <a class="blog-form-submit" href="${escHtml(imageUrl)}" download="${safeTitle}_thumbnail.png" target="_blank">
+            ${lucideSVG('download', 14, 'currentColor')} Download PNG
+          </a>` : ''}
+      </div>
+    </div>
+  `
+  _mount.appendChild(overlay)
+  overlay.querySelector('#thumb-card-close').addEventListener('click',  () => overlay.remove())
+  overlay.querySelector('#thumb-card-close2').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
 }
 
 async function moveTemplateToFolder(templateId, folderId) {
