@@ -838,11 +838,11 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
     try {
       const result = await apiFetch('/api/thumbnail/generate', {
         method: 'POST',
-        body: JSON.stringify(blogMeta)
+        body: JSON.stringify({ ...blogMeta, attempt: 0 })
       })
       if (!result.ok && result.error) throw new Error(result.error)
       overlay.remove()
-      showThumbnailPicker(blogMeta, result, csvRows, currentIndex)
+      showThumbnailPicker(blogMeta, result, csvRows, currentIndex, 0)
     } catch (err) {
       showBlogFormError(overlay, err.message || 'Generation failed — try again')
       btn.disabled = false
@@ -863,11 +863,12 @@ function hideFormError(overlay) {
 }
 
 // ── Thumbnail image picker ────────────────────────────────────────────────────
-function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0) {
+function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0, attempt = 0) {
   if (result.type === 'talk-data') {
     showTalkDataForm(blogMeta, csvRows, currentIndex)
     return
   }
+  let _attempt = attempt
 
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const isBulk = csvRows && csvRows.length > 1
@@ -913,12 +914,13 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0)
     btn.disabled = true
     btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Fetching…`
     try {
+      _attempt += 1
       const newResult = await apiFetch('/api/thumbnail/generate', {
         method: 'POST',
-        body: JSON.stringify({ ...blogMeta, excludeIds: result.options.map(o => o.id) })
+        body: JSON.stringify({ ...blogMeta, excludeIds: result.options.map(o => o.id), attempt: _attempt })
       })
       overlay.remove()
-      showThumbnailPicker(blogMeta, newResult, csvRows, currentIndex)
+      showThumbnailPicker(blogMeta, newResult, csvRows, currentIndex, _attempt)
     } catch (err) {
       btn.disabled = false
       btn.innerHTML = `${lucideSVG('refresh-cw', 14, 'currentColor')} Try again`

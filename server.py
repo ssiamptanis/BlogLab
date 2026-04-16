@@ -1116,20 +1116,41 @@ FIGMA_THUMBNAILS_FILE_KEY = '0b47ipE59eoQ72I7ceHkPd'
 _figma_pages_cache = {}
 
 
-def _build_search_query(title, meta_desc, subtitles, category):
-    """Build a Pexels search query. Uses Gemini if available, otherwise keyword extraction."""
+# Visual terms per category — used to vary queries across attempts
+_CATEGORY_VISUAL_TERMS = {
+    'audiences':            ['people', 'crowd', 'community', 'diverse group', 'consumers', 'society', 'audience', 'culture'],
+    'consumer behaviour':   ['shopping', 'retail', 'consumer', 'purchase', 'lifestyle', 'buying', 'market', 'choice'],
+    'digital trends':       ['technology', 'digital', 'innovation', 'internet', 'mobile', 'connectivity', 'future', 'data'],
+    'data journalism':      ['data', 'charts', 'analytics', 'research', 'statistics', 'analysis', 'graphs', 'reporting'],
+}
+
+# Visual angle modifiers — rotate through these to give each attempt a different feel
+_VISUAL_ANGLES = [
+    '',                         # attempt 0: no modifier (pure subject)
+    'aerial view overhead',     # attempt 1: bird's eye
+    'close up detail macro',    # attempt 2: intimate/detail
+    'wide panoramic landscape', # attempt 3: wide shot
+    'dark moody dramatic',      # attempt 4: mood shift
+    'bright minimal clean',     # attempt 5: clean aesthetic
+]
+
+
+def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
+    """Build a Pexels search query varied by attempt number."""
+    rng = random.Random(attempt * 31337)  # Deterministic but different per attempt
+
     if GEMINI_API_KEY:
         try:
             import json as _json
+            angle_hint = _VISUAL_ANGLES[attempt % len(_VISUAL_ANGLES)]
             prompt = (
-                f"You are helping select a stock photo for a blog thumbnail.\n"
-                f"Blog title: {title}\n"
-                f"Category: {category}\n"
-                f"Meta description: {meta_desc or 'N/A'}\n"
-                f"Subtitles: {subtitles or 'N/A'}\n\n"
+                f"You are helping select a stock photo for a blog thumbnail (attempt {attempt + 1}).\n"
+                f"Blog title: {title}\nCategory: {category}\n"
+                f"Meta description: {meta_desc or 'N/A'}\n\n"
                 f"Return a JSON object with one key 'query' containing 5-8 keywords "
-                f"for searching Pexels stock photos that visually represent this blog. "
-                f"Focus on concrete visual subjects, not abstract concepts.\n"
+                f"for a Pexels image search. Focus on the OVERALL THEME of the title and category — "
+                f"not individual subtitles. Make this attempt feel visually distinct "
+                f"{'using a ' + angle_hint + ' perspective' if angle_hint else ''}.\n"
                 f"Example: {{\"query\": \"professional woman laptop office technology\"}}"
             )
             res = _requests.post(
@@ -1144,36 +1165,60 @@ def _build_search_query(title, meta_desc, subtitles, category):
                     text = text[4:]
             return _json.loads(text.strip())['query']
         except Exception:
-            pass  # Fall through to keyword extraction
+            pass
 
-    # Fallback: keyword extraction from inputs
+    # Fallback keyword extraction — title + category dominate, subtitles barely contribute
     stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
                   'of', 'with', 'by', 'from', 'is', 'are', 'was', 'be', 'this', 'that',
-                  'how', 'why', 'what', 'why', 'its', 'it', 'as', 'into'}
-    parts = [title, category, subtitles or '', meta_desc or '']
-    words = []
-    for part in parts:
-        for w in part.replace(',', ' ').replace('-', ' ').split():
+                  'how', 'why', 'what', 'its', 'it', 'as', 'into', 'state', 'data', 'new'}
+
+    def extract(text, max_words):
+        words = []
+        for w in text.replace(',', ' ').replace('-', ' ').split():
             w = w.strip('.,!?:;"\'/()').lower()
-            if w and w not in stop_words and len(w) > 2:
+            if w and w not in stop_words and len(w) > 3:
                 words.append(w)
-    # Deduplicate preserving order, take top 8
+                if len(words) >= max_words:
+                    break
+        return words
+
+    # Title: up to 4 words (primary signal)
+    title_words = extract(title, 4)
+
+    # Category visual terms: pick 3, rotated per attempt
+    cat_terms = _CATEGORY_VISUAL_TERMS.get(category, [category])
+    rng.shuffle(cat_terms)
+    cat_words = cat_terms[:3]
+
+    # Visual angle for variety
+    angle = _VISUAL_ANGLES[attempt % len(_VISUAL_ANGLES)]
+    angle_words = angle.split() if angle else []
+
+    # Subtitles: at most 1 word, only on first attempt
+    sub_words = extract(subtitles or '', 1) if attempt == 0 else []
+
+    # Combine, deduplicate, limit to 8
+    combined = title_words + cat_words + sub_words + angle_words
     seen = set()
-    unique = [w for w in words if not (w in seen or seen.add(w))]
+    unique = [w for w in combined if not (w in seen or seen.add(w))]
     return ' '.join(unique[:8])
 
 
-def _search_pexels(query, count=3, exclude_ids=None):
-    """Search Pexels and return image options."""
+def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
+    """Search Pexels and return image options, using different pages per attempt."""
+    page = (attempt // 2) + 1  # New page every 2 attempts
     res = _requests.get(
         'https://api.pexels.com/v1/search',
         headers={'Authorization': PEXELS_API_KEY},
-        params={'query': query, 'per_page': 20, 'orientation': 'landscape'},
+        params={'query': query, 'per_page': 30, 'page': page, 'orientation': 'landscape'},
         timeout=10
     )
     photos = res.json().get('photos', [])
     if exclude_ids:
         photos = [p for p in photos if str(p['id']) not in exclude_ids]
+    # Shuffle within results for additional variety
+    rng = random.Random(attempt * 999)
+    rng.shuffle(photos)
     selected = photos[:count]
     return [{'id': str(p['id']), 'url': p['src']['large2x'], 'preview': p['src']['large'],
              'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
@@ -1254,6 +1299,7 @@ def generate_thumbnail_options():
     subtitles  = data.get('subtitles', '').strip()
     category   = data.get('category', '').strip().lower()
     exclude_ids = data.get('excludeIds', [])
+    attempt     = int(data.get('attempt', 0))
 
     if not title:
         return jsonify({'error': 'Title is required'}), 400
@@ -1266,13 +1312,13 @@ def generate_thumbnail_options():
     if category == 'talk data to me':
         return jsonify({'type': 'talk-data', 'category': category})
 
-    # Build search query
-    query = _build_search_query(title, meta_desc, subtitles, category)
+    # Build search query (varies by attempt)
+    query = _build_search_query(title, meta_desc, subtitles, category, attempt)
 
     # Pexels categories
     if category in PEXELS_CATEGORIES:
         try:
-            options = _search_pexels(query, count=3, exclude_ids=exclude_ids)
+            options = _search_pexels(query, count=3, exclude_ids=exclude_ids, attempt=attempt)
             return jsonify({'type': 'pexels', 'category': category,
                             'search_query': query, 'options': options})
         except Exception as e:
