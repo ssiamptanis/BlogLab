@@ -1018,27 +1018,41 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
     btn.disabled = true
     btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Saving…`
 
-    // Save to dashboard + trigger browser download
+    // Save directly via Supabase JS client — bypasses Flask entirely so RLS
+    // always passes with the user's live session token
     try {
-      const saved = await apiFetch('/api/thumbnail/save', {
-        method: 'POST',
-        body: JSON.stringify({ title: blogMeta.title, imageUrl: sourceImageUrl, blogMeta })
-      })
-      // Add to dashboard cards immediately
-      if (saved.template) {
-        _templates.unshift({
-          ...saved.template,
-          doc_author:        _dashUser?.name      || '',
-          doc_author_avatar: _dashUser?.avatarUrl || '',
+      const user = await _getDashUser()
+      const { data: record, error } = await supabase
+        .from('templates')
+        .insert({
+          name:          blogMeta.title,
+          status:        'saved',
+          folder_id:     null,
+          template_type: 'blog-thumbnail',
+          doc:           { imageUrl: sourceImageUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
+          block_count:   0,
+          block_types:   [],
         })
-        refreshGrid()
-      }
+        .select()
+        .single()
+
+      if (error) throw new Error(error.message)
+
+      // Push new card to top of dashboard immediately
+      _templates.unshift({
+        ...record,
+        doc_image_url:     sourceImageUrl || '',
+        doc_author:        user.name      || '',
+        doc_author_avatar: user.avatarUrl || '',
+      })
+      _templates_cache_invalidate?.()
+      refreshGrid()
       showToast(`"${blogMeta.title}" saved to dashboard`)
     } catch (err) {
-      showToast('Could not save to dashboard — check connection', 'error')
+      showToast(`Save failed: ${err.message}`, 'error')
     }
 
-    // Trigger download regardless of save result
+    // Always trigger browser download regardless of save result
     const a = document.createElement('a')
     a.href     = imageDataUrl
     a.download = `${safeTitle}_thumbnail.png`

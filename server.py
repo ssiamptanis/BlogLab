@@ -1346,20 +1346,24 @@ def _compose_image(image_url, width=1200, height=700):
     is_portrait_src = src_h > src_w   # taller than wide → likely has a person
 
     if src_ratio > target_ratio:
-        # Source is wider than target ratio → crop width, keep full height
+        # Source wider than target → centre-crop width, keep full height
         new_w = int(src_h * target_ratio)
-        left = (src_w - new_w) // 2
-        img = img.crop((left, 0, left + new_w, src_h))
+        left  = (src_w - new_w) // 2
+        img   = img.crop((left, 0, left + new_w, src_h))
+    elif is_portrait_src:
+        # Portrait source (person photo) — take only the top 35% of the image
+        # height so we always frame head + shoulders (bust shot), regardless of
+        # whether Pexels returned a headshot or a full-body photo.
+        crop_h = int(src_h * 0.35)           # top 35% of height
+        crop_w = int(crop_h * target_ratio)   # width to match 1200:700 ratio
+        crop_w = min(crop_w, src_w)           # never exceed actual width
+        left   = (src_w - crop_w) // 2       # centre horizontally
+        img    = img.crop((left, 0, left + crop_w, crop_h))
     else:
-        # Source is narrower than target ratio → crop height
+        # Landscape / square source → centre-crop height
         new_h = int(src_w / target_ratio)
-        if is_portrait_src:
-            # Anchor hard to the top — never cut the head/face
-            top = 0
-        else:
-            # Landscape/square source: centre crop is safe
-            top = (src_h - new_h) // 2
-        img = img.crop((0, top, src_w, top + new_h))
+        top   = (src_h - new_h) // 2
+        img   = img.crop((0, top, src_w, top + new_h))
 
     img = img.resize((width, height), Image.LANCZOS)
     buf = io.BytesIO()
