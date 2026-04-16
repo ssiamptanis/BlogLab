@@ -209,8 +209,8 @@ function gridHTML() {
   if (!list.length) {
     return `<div class="dash-empty">
       <div class="dash-empty-icon">${lucideSVG('file-plus', 40, '#CED9EB')}</div>
-      <h3>${_search ? 'No results found' : 'Create new asset'}</h3>
-      <p>${_search ? 'Try a different search.' : 'Click "+ Create new asset" to get started.'}</p>
+      <h3>${_search ? 'No results found' : 'Create new thumbnail(s)'}</h3>
+      <p>${_search ? 'Try a different search.' : 'Click "+ Create new thumbnail(s)" to get started.'}</p>
     </div>`
   }
 
@@ -239,7 +239,7 @@ function renderDashboardHTML() {
         <!-- Left sidebar -->
         <aside class="dash-sidebar">
           <div class="dash-sidebar-top">
-            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px">+ Create new asset</button>
+            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px">+ Create new thumbnail(s)</button>
           </div>
           <div class="dash-sidebar-section">
             <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">My files</button>
@@ -762,7 +762,8 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
 
         <div class="blog-form-field">
           <label class="blog-form-label" for="blog-category">
-            Category <span class="blog-form-hint">(Audiences, Consumer behaviour, Digital trends, Data journalism, Talk data to me, Product, Strategy)</span>
+            Category <span class="blog-form-required">*</span>
+            <span class="blog-form-hint">(Audiences, Consumer behaviour, Digital trends, Data journalism, Talk data to me, Product, Strategy)</span>
           </label>
           <input class="blog-form-input" id="blog-category" type="text" value="${(prefill?.category || '').replace(/"/g, '&quot;')}" placeholder="e.g. Digital trends" />
         </div>
@@ -834,6 +835,11 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
       category:  overlay.querySelector('#blog-category').value.trim(),
     }
     if (!blogMeta.title) return
+    if (!blogMeta.category) {
+      showBlogFormError(overlay, 'Category is required — please enter one of the listed categories')
+      overlay.querySelector('#blog-category').focus()
+      return
+    }
     const btn = overlay.querySelector('#blog-form-submit')
     btn.disabled = true
     btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Generating…`
@@ -947,7 +953,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
           body: JSON.stringify({ imageUrl: card.dataset.url })
         })
         overlay.remove()
-        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, _attempt)
+        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, _attempt, card.dataset.url)
       } catch (err) {
         const errEl = overlay.querySelector('#thumb-picker-error')
         errEl.textContent = 'Failed to compose image — try another'
@@ -959,7 +965,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
 }
 
 // ── Thumbnail result (download + next) ───────────────────────────────────────
-function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0) {
+function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0, sourceImageUrl = null) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const isBulk    = csvRows && csvRows.length > 1
   const hasNext   = isBulk && currentIndex < csvRows.length - 1
@@ -1016,8 +1022,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
     try {
       const saved = await apiFetch('/api/thumbnail/save', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: blogMeta.title, imageData: imageDataUrl, blogMeta })
+        body: JSON.stringify({ title: blogMeta.title, imageUrl: sourceImageUrl, blogMeta })
       })
       // Add to dashboard cards immediately
       if (saved.template) {

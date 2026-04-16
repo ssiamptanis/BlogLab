@@ -1117,29 +1117,53 @@ FIGMA_THUMBNAILS_FILE_KEY = '0b47ipE59eoQ72I7ceHkPd'
 _figma_pages_cache = {}
 
 
-# Visual terms per category — used to vary queries across attempts
+# Visual terms per category — used to vary queries across attempts.
+# All Pexels categories use minimal/clean imagery; Audiences always favours
+# a real person facing the camera on a plain solid-colour background.
 _CATEGORY_VISUAL_TERMS = {
-    'audiences':            ['people', 'crowd', 'community', 'diverse group', 'consumers', 'society', 'audience', 'culture'],
-    'consumer behaviour':   ['shopping', 'retail', 'consumer', 'purchase', 'lifestyle', 'buying', 'market', 'choice'],
-    'digital trends':       ['technology', 'digital', 'innovation', 'internet', 'mobile', 'connectivity', 'future', 'data'],
-    'data journalism':      ['data', 'charts', 'analytics', 'research', 'statistics', 'analysis', 'graphs', 'reporting'],
+    'audiences':          ['portrait', 'person', 'facing camera', 'studio', 'solid color background', 'minimal', 'professional headshot', 'clean backdrop'],
+    'consumer behaviour': ['lifestyle', 'minimal', 'clean', 'simple background', 'everyday', 'product', 'flat lay', 'modern'],
+    'digital trends':     ['technology', 'minimal', 'clean desk', 'simple background', 'digital', 'modern', 'flat lay', 'mobile'],
+    'data journalism':    ['data', 'charts', 'analytics', 'minimal', 'clean', 'simple background', 'flat lay', 'research'],
 }
 
-# Visual angle modifiers — rotate through these to give each attempt a different feel
+# Visual angle modifiers for non-audiences categories only.
+# For audiences we always lock to portrait/person, so angles are not applied.
 _VISUAL_ANGLES = [
-    '',                         # attempt 0: no modifier (pure subject)
-    'aerial view overhead',     # attempt 1: bird's eye
-    'close up detail macro',    # attempt 2: intimate/detail
-    'wide panoramic landscape', # attempt 3: wide shot
-    'dark moody dramatic',      # attempt 4: mood shift
-    'bright minimal clean',     # attempt 5: clean aesthetic
+    '',                         # attempt 0: no modifier
+    'simple color background',  # attempt 1
+    'studio portrait minimal',  # attempt 2
+    'clean flat lay overhead',  # attempt 3
+    'bright white background',  # attempt 4
+    'pastel background minimal',# attempt 5
 ]
+
+# Global aesthetic modifiers appended to every Pexels query to push toward
+# simple, uncluttered compositions
+_GLOBAL_AESTHETIC = 'minimal simple background clean'
 
 
 def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
-    """Build a Pexels search query varied by attempt number."""
-    rng = random.Random(attempt * 31337)  # Deterministic but different per attempt
+    """Build a Pexels search query varied by attempt number.
+    Audiences always returns a person facing camera on a plain background.
+    All other categories use minimal/clean imagery.
+    """
+    rng = random.Random(attempt * 31337)
 
+    # ── Audiences: always a real person on plain solid background ─────────────
+    if category == 'audiences':
+        # Rotate through portrait-style variations per attempt
+        audiences_queries = [
+            'person portrait solid color background minimal facing camera',
+            'woman man studio portrait plain background professional',
+            'close up face portrait clean simple backdrop',
+            'person looking at camera solid background minimal',
+            'professional portrait bright solid color background',
+            'headshot person simple plain studio background',
+        ]
+        return audiences_queries[attempt % len(audiences_queries)]
+
+    # ── Gemini path (if configured) ───────────────────────────────────────────
     if GEMINI_API_KEY:
         try:
             import json as _json
@@ -1149,10 +1173,12 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
                 f"Blog title: {title}\nCategory: {category}\n"
                 f"Meta description: {meta_desc or 'N/A'}\n\n"
                 f"Return a JSON object with one key 'query' containing 5-8 keywords "
-                f"for a Pexels image search. Focus on the OVERALL THEME of the title and category — "
-                f"not individual subtitles. Make this attempt feel visually distinct "
-                f"{'using a ' + angle_hint + ' perspective' if angle_hint else ''}.\n"
-                f"Example: {{\"query\": \"professional woman laptop office technology\"}}"
+                f"for a Pexels image search. The image MUST be simple and minimal — "
+                f"plain or solid-colour background, uncluttered composition, clean layout. "
+                f"Focus on the OVERALL THEME of the title and category, not individual subtitles. "
+                f"Make this attempt visually distinct "
+                f"{'(' + angle_hint + ')' if angle_hint else ''}.\n"
+                f"Example: {{\"query\": \"minimal technology flat lay clean white background\"}}"
             )
             res = _requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
@@ -1168,7 +1194,7 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
         except Exception:
             pass
 
-    # Fallback keyword extraction — title + category dominate, subtitles barely contribute
+    # ── Fallback keyword extraction ───────────────────────────────────────────
     stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
                   'of', 'with', 'by', 'from', 'is', 'are', 'was', 'be', 'this', 'that',
                   'how', 'why', 'what', 'its', 'it', 'as', 'into', 'state', 'data', 'new'}
@@ -1183,41 +1209,63 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
                     break
         return words
 
-    # Title: up to 4 words (primary signal)
-    title_words = extract(title, 4)
+    # Title: up to 3 words (primary subject signal)
+    title_words = extract(title, 3)
 
-    # Category visual terms: pick 3, rotated per attempt
-    cat_terms = _CATEGORY_VISUAL_TERMS.get(category, [category])
+    # Category visual terms: pick 2, rotated per attempt
+    cat_terms = list(_CATEGORY_VISUAL_TERMS.get(category, ['minimal', 'clean', category]))
     rng.shuffle(cat_terms)
-    cat_words = cat_terms[:3]
+    cat_words = cat_terms[:2]
 
-    # Visual angle for variety
+    # Visual angle for variety (non-audiences only)
     angle = _VISUAL_ANGLES[attempt % len(_VISUAL_ANGLES)]
     angle_words = angle.split() if angle else []
 
     # Subtitles: at most 1 word, only on first attempt
     sub_words = extract(subtitles or '', 1) if attempt == 0 else []
 
-    # Combine, deduplicate, limit to 8
-    combined = title_words + cat_words + sub_words + angle_words
+    # Always append global aesthetic modifiers (deduplicated below)
+    aesthetic_words = _GLOBAL_AESTHETIC.split()
+
+    combined = title_words + cat_words + sub_words + angle_words + aesthetic_words
     seen = set()
     unique = [w for w in combined if not (w in seen or seen.add(w))]
-    return ' '.join(unique[:8])
+    return ' '.join(unique[:10])
 
 
 def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
-    """Search Pexels and return image options, using different pages per attempt."""
+    """Search Pexels and return image options, using different pages per attempt.
+    Fetches 40 results and scores them for simplicity — prefers images with
+    simple/plain backgrounds (portrait orientation is allowed for audiences).
+    """
     page = (attempt // 2) + 1  # New page every 2 attempts
+
+    # Audiences queries portrait orientation; all others landscape
+    is_portrait_query = any(w in query for w in ('portrait', 'headshot', 'face'))
+    orientation = 'portrait' if is_portrait_query else 'landscape'
+
     res = _requests.get(
         'https://api.pexels.com/v1/search',
         headers={'Authorization': PEXELS_API_KEY},
-        params={'query': query, 'per_page': 30, 'page': page, 'orientation': 'landscape'},
+        params={'query': query, 'per_page': 40, 'page': page, 'orientation': orientation},
         timeout=10
     )
     photos = res.json().get('photos', [])
+
+    # If portrait returned nothing useful, fall back to landscape
+    if not photos and orientation == 'portrait':
+        res = _requests.get(
+            'https://api.pexels.com/v1/search',
+            headers={'Authorization': PEXELS_API_KEY},
+            params={'query': query, 'per_page': 40, 'page': page, 'orientation': 'landscape'},
+            timeout=10
+        )
+        photos = res.json().get('photos', [])
+
     if exclude_ids:
         photos = [p for p in photos if str(p['id']) not in exclude_ids]
-    # Shuffle within results for additional variety
+
+    # Shuffle within results for additional variety per attempt
     rng = random.Random(attempt * 999)
     rng.shuffle(photos)
     selected = photos[:count]
@@ -1355,28 +1403,26 @@ def compose_thumbnail():
 @app.route('/api/thumbnail/save', methods=['POST'])
 @require_auth
 def save_thumbnail():
-    """Save a composed thumbnail PNG to Supabase Storage and create a template record."""
-    data       = request.get_json(force=True)
-    title      = (data.get('title') or 'Untitled').strip()
-    image_data = (data.get('imageData') or '').strip()
-    blog_meta  = data.get('blogMeta') or {}
+    """Re-compose a thumbnail from the source URL, upload to storage, create template record."""
+    data      = request.get_json(force=True) or {}
+    title     = (data.get('title') or 'Untitled').strip()
+    image_url = (data.get('imageUrl') or '').strip()
+    blog_meta = data.get('blogMeta') or {}
 
-    if not image_data:
-        return jsonify({'error': 'imageData is required'}), 400
+    if not image_url:
+        return jsonify({'error': 'imageUrl is required'}), 400
 
-    # Strip data URL prefix
-    if ',' in image_data:
-        image_data = image_data.split(',', 1)[1]
-
+    # Re-compose the 1200×700 PNG from the original source URL
     try:
-        png_bytes = base64.b64decode(image_data)
-    except Exception:
-        return jsonify({'error': 'Invalid base64 image data'}), 400
+        b64 = _compose_image(image_url)
+        png_bytes = base64.b64decode(b64)
+    except Exception as e:
+        return jsonify({'error': f'Image compose failed: {e}'}), 500
 
-    # Build safe filename from blog title
+    # Use same path prefix as user uploads so RLS definitely allows it
     safe_title = ''.join(c if c.isalnum() or c in '-_ ' else '_' for c in title).strip().replace(' ', '_')[:60]
     ts = int(time.time())
-    storage_path = f"thumbnails/{g.user_id}/{ts}_{safe_title}.png"
+    storage_path = f"{g.user_id}/thumbnails/{ts}_{safe_title}.png"
 
     try:
         _sb.storage.from_("abx-images").upload(
@@ -1386,7 +1432,10 @@ def save_thumbnail():
         )
         url_res    = _sb.storage.from_("abx-images").create_signed_url(storage_path, 60 * 60 * 24 * 365)
         signed_url = _signed_url(url_res)
+        if not signed_url:
+            raise ValueError("Empty signed URL returned from storage")
     except Exception as e:
+        print(f'[save_thumbnail] storage error: {e}', flush=True)
         return jsonify({'error': f'Storage upload failed: {e}'}), 500
 
     # Create template record so it appears on the dashboard
@@ -1404,10 +1453,10 @@ def save_thumbnail():
         }).execute()
         _templates_cache_invalidate(g.user_id)
         record = res.data[0]
-        # Attach doc_image_url so dashboard can render the card immediately
         record["doc_image_url"] = signed_url
         return jsonify({'ok': True, 'template': record}), 201
     except Exception as e:
+        print(f'[save_thumbnail] template insert error: {e}', flush=True)
         return jsonify({'error': f'Template save failed: {e}'}), 500
 
 
