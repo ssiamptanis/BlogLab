@@ -3389,6 +3389,115 @@ body, html { overflow-x: hidden; }
   backdrop-filter: blur(4px);
 }
 
+/* ── Blog thumbnail input form ───────────────────────────────── */
+.blog-form-modal {
+  width: 560px !important;
+  max-width: 96vw;
+}
+
+.blog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 4px 0 8px;
+}
+
+.blog-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blog-form-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #E2E8F0;
+  letter-spacing: 0.01em;
+}
+
+.blog-form-required {
+  color: var(--pink);
+  margin-left: 2px;
+}
+
+.blog-form-hint {
+  font-weight: 400;
+  color: #64748B;
+  font-size: 12px;
+}
+
+.blog-form-input {
+  background: #0D1420;
+  border: 1px solid #2A3447;
+  border-radius: 8px;
+  color: #E2E8F0;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.blog-form-input:focus {
+  border-color: var(--pink);
+}
+
+.blog-form-input::placeholder {
+  color: #3D4F6B;
+}
+
+.blog-form-textarea {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.5;
+}
+
+.blog-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.blog-form-cancel {
+  background: transparent;
+  border: 1px solid #2A3447;
+  border-radius: 8px;
+  color: #94A3B8;
+  font-size: 14px;
+  font-family: inherit;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.blog-form-cancel:hover {
+  border-color: #94A3B8;
+  color: #E2E8F0;
+}
+
+.blog-form-submit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--pink);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.blog-form-submit:hover {
+  opacity: 0.88;
+}
+
 /* ── Spark section in template picker ───────────────────────── */
 .tmpl-picker-modal {
   width: 860px;

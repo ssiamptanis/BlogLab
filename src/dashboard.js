@@ -482,72 +482,11 @@ const INFOGRAPHIC_PREVIEW = `<svg viewBox="0 0 200 283" fill="none" xmlns="http:
 
 const TEMPLATE_TYPES = [
   {
-    id: 'insight-report',
-    name: 'One pager PDF',
-    description: 'Best for delivering multiple data points across several topics. Pairs stats with context so decision-makers can absorb and act on findings quickly — ideal for sales decks, client briefs, and research outputs.',
-    preview: INSIGHT_REPORT_PREVIEW,
-    icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>`,
-    blocks: [
-      {
-        type: 'abx-header',
-        title: 'Lorem ipsum dolor sit amet',
-        descriptor: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Phasellus pellentesque quam ut sapien placerat lobortis.',
-        image: '',
-        image_scale: 1.25
-      },
-      {
-        type: 'stat-cards',
-        card: false, card_bg: '#FFFFFF', card_border: '',
-        left: {
-          section_num: '01', section_title: 'Section heading', body: '',
-          items: [
-            { value_type: 'stat', value: '14', unit: '%', description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', icon: '' },
-            { value_type: 'stat', value: '15', unit: '%', description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', icon: '' }
-          ]
-        },
-        right: {
-          section_num: '02', section_title: 'Section heading', body: '',
-          items: [
-            { value_type: 'icon', value: '68', unit: '%', description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', icon: 'Icon=Compass, Colour=On white.svg' }
-          ]
-        }
-      },
-      {
-        type: 'divider',
-        card: false, card_bg: '#FFFFFF', card_border: '', thick: false
-      },
-      {
-        type: 'stat-cards',
-        card: false, card_bg: '#FFFFFF', card_border: '',
-        left: {
-          section_num: '03', section_title: 'Section heading', body: '',
-          items: [
-            { value_type: 'icon', value: '14', unit: '%', description: 'of professionals say their company uses Instagram.', icon: 'Icon=Chat, Colour=On white.svg' }
-          ]
-        },
-        right: {
-          section_num: '04', section_title: 'Section heading', body: '',
-          items: [
-            { value_type: 'stat', value: '68', unit: '%', description: 'of Gen Z consumers prefer video content over static posts.', icon: '' },
-            { value_type: 'stat', value: '22', unit: '%', description: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.', icon: '' }
-          ]
-        }
-      },
-      {
-        type: 'footer',
-        text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-        button_label: 'Find out more',
-        button_url: ''
-      },
-    ]
-  },
-  {
     id: 'blog-thumbnail',
     name: 'Blog thumbnail image',
     description: 'Create a branded thumbnail image for blog posts and articles. Eye-catching visuals sized and styled for GWI\'s content channels.',
     preview: null,
     icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
-    comingSoon: true,
     blocks: []
   },
 ]
@@ -606,7 +545,11 @@ export function showTemplatePicker(navigateFn) {
   overlay.querySelectorAll('.tmpl-picker-card:not([disabled])').forEach(btn => {
     btn.addEventListener('click', async () => {
       overlay.remove()
-      await onNewTemplate(btn.dataset.type)
+      if (btn.dataset.type === 'blog-thumbnail') {
+        showBlogThumbnailForm()
+      } else {
+        await onNewTemplate(btn.dataset.type)
+      }
     })
   })
 
@@ -743,7 +686,77 @@ async function _fetchIllustrationUrl() {
   return ''
 }
 
-async function onNewTemplate(typeId = 'insight-report') {
+function showBlogThumbnailForm() {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  _mount.querySelector('.blog-form-overlay')?.remove()
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal blog-form-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Blog thumbnail details</h2>
+          <p class="tmpl-picker-subtitle">Fill in the details below to get started</p>
+        </div>
+        <button class="tmpl-picker-close" id="blog-form-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+
+      <form class="blog-form" id="blog-thumbnail-form" autocomplete="off">
+        <div class="blog-form-field">
+          <label class="blog-form-label" for="blog-title">Blog title <span class="blog-form-required">*</span></label>
+          <input class="blog-form-input" id="blog-title" type="text" placeholder="e.g. The state of social media in 2025" required />
+        </div>
+
+        <div class="blog-form-field">
+          <label class="blog-form-label" for="blog-meta">Meta description</label>
+          <textarea class="blog-form-input blog-form-textarea" id="blog-meta" rows="4"
+            placeholder="e.g. A look at how audiences across markets are engaging with social platforms this year…"></textarea>
+        </div>
+
+        <div class="blog-form-field">
+          <label class="blog-form-label" for="blog-subtitles">Body subtitles <span class="blog-form-hint">(optional — one per line)</span></label>
+          <textarea class="blog-form-input blog-form-textarea" id="blog-subtitles" rows="3"
+            placeholder="e.g.\nWhy TikTok still leads\nInstagram's resurgence\nWhat B2B audiences want"></textarea>
+        </div>
+
+        <div class="blog-form-field">
+          <label class="blog-form-label" for="blog-category">Category</label>
+          <input class="blog-form-input" id="blog-category" type="text" placeholder="e.g. Social Media, Consumer Trends, Technology" />
+        </div>
+
+        <div class="blog-form-actions">
+          <button type="button" class="blog-form-cancel" id="blog-form-cancel">Cancel</button>
+          <button type="submit" class="blog-form-submit">
+            Create thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
+          </button>
+        </div>
+      </form>
+    </div>
+  `
+
+  _mount.appendChild(overlay)
+  overlay.querySelector('#blog-title').focus()
+
+  const close = () => overlay.remove()
+  overlay.querySelector('#blog-form-close').addEventListener('click', close)
+  overlay.querySelector('#blog-form-cancel').addEventListener('click', close)
+  overlay.addEventListener('click', e => { if (e.target === overlay) close() })
+
+  overlay.querySelector('#blog-thumbnail-form').addEventListener('submit', async e => {
+    e.preventDefault()
+    const blogMeta = {
+      title:     overlay.querySelector('#blog-title').value.trim(),
+      metaDesc:  overlay.querySelector('#blog-meta').value.trim(),
+      subtitles: overlay.querySelector('#blog-subtitles').value.trim(),
+      category:  overlay.querySelector('#blog-category').value.trim(),
+    }
+    overlay.remove()
+    await onNewTemplate('blog-thumbnail', blogMeta)
+  })
+}
+
+async function onNewTemplate(typeId = 'blog-thumbnail', blogMeta = null) {
   const tmplType = TEMPLATE_TYPES.find(t => t.id === typeId) || TEMPLATE_TYPES[0]
 
   // Both hero block types use the same illustration — apply to either
@@ -771,13 +784,16 @@ async function onNewTemplate(typeId = 'insight-report') {
   // Fetch user profile for author stamping (non-blocking — fire and continue)
   const user = await _getDashUser()
 
+  // Use blog title as template name if provided
+  const templateName = (blogMeta?.title) || 'Untitled'
+
   // Store inline so renderApp can apply instantly — no API round-trip needed
   window._pendingNewTemplate = {
     tempId,
-    name:          'Untitled',
+    name:          templateName,
     template_type: tmplType.id,
     folder_id:     _activeFolderId || null,
-    doc: { filename: 'untitled.pdf', docAuthor: user.name, docAuthorAvatar: user.avatarUrl, blocks: initBlocks }
+    doc: { filename: 'untitled.pdf', docAuthor: user.name, docAuthorAvatar: user.avatarUrl, blocks: initBlocks, blogMeta: blogMeta || {} }
   }
 
   // Navigate immediately — editor UI appears at once
@@ -794,11 +810,11 @@ async function onNewTemplate(typeId = 'insight-report') {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name:          'Untitled',
+          name:          templateName,
           status:        'draft',
           folder_id:     _activeFolderId || null,
           template_type: tmplType.id,
-          doc: { filename: 'untitled.pdf', docAuthor: user.name, docAuthorAvatar: user.avatarUrl, blocks: finalBlocks }
+          doc: { filename: 'untitled.pdf', docAuthor: user.name, docAuthorAvatar: user.avatarUrl, blocks: finalBlocks, blogMeta: blogMeta || {} }
         })
       })
 
