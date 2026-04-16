@@ -1053,6 +1053,45 @@ def health():
     return jsonify({"ok": True})
 
 
+@app.route("/api/test/pexels")
+def test_pexels():
+    api_key = os.environ.get("PEXELS_API_KEY", "")
+    if not api_key:
+        return jsonify({"ok": False, "error": "PEXELS_API_KEY not set"}), 500
+    try:
+        res = _requests.get(
+            "https://api.pexels.com/v1/search",
+            headers={"Authorization": api_key},
+            params={"query": "data analytics", "per_page": 1, "orientation": "landscape"},
+            timeout=10
+        )
+        data = res.json()
+        photo = data.get("photos", [{}])[0]
+        return jsonify({"ok": True, "total_results": data.get("total_results"), "sample_image": photo.get("src", {}).get("medium")})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.route("/api/test/figma")
+def test_figma():
+    token = os.environ.get("FIGMA_TOKEN", "")
+    if not token:
+        return jsonify({"ok": False, "error": "FIGMA_TOKEN not set"}), 500
+    try:
+        file_key = "0b47ipE59eoQ72I7ceHkPd"
+        res = _requests.get(
+            f"https://api.figma.com/v1/files/{file_key}",
+            headers={"X-Figma-Token": token},
+            timeout=15
+        )
+        data = res.json()
+        if "err" in data:
+            return jsonify({"ok": False, "error": data["err"]}), 500
+        return jsonify({"ok": True, "file_name": data.get("name"), "last_modified": data.get("lastModified")})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 if __name__ == "__main__":
     # Railway sets PORT; fallback to FLASK_PORT for local dev
     port = int(os.environ.get("PORT", os.environ.get("FLASK_PORT", 5001)))
