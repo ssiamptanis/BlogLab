@@ -1329,12 +1329,57 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
             for f in selected if images.get(f['id'])]
 
 
+def _detect_face_box(pil_img):
+    """Return (x, y, w, h) of the largest detected frontal face, or None.
+
+    Uses OpenCV's Haar Cascade — fast, offline, no API key needed.
+    Tries multiple scale factors so it catches both close-up and distant faces.
+    """
+    try:
+        import cv2
+        import numpy as np
+
+        # Convert PIL → OpenCV BGR array → greyscale for detection
+        img_array = np.array(pil_img.convert('RGB'))
+        grey      = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
+
+        cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        detector     = cv2.CascadeClassifier(cascade_path)
+
+        # Run at several scale factors: catches faces at different distances
+        faces = []
+        for scale in (1.05, 1.1, 1.2):
+            found = detector.detectMultiScale(
+                grey,
+                scaleFactor=scale,
+                minNeighbors=4,
+                minSize=(60, 60),
+            )
+            if len(found) > 0:
+                faces.extend(found.tolist())
+
+        if not faces:
+            return None
+
+        # Pick the largest face (most prominent subject)
+        faces.sort(key=lambda f: f[2] * f[3], reverse=True)
+        x, y, w, h = faces[0]
+        print(f'[face-detect] found face at x={x} y={y} w={w} h={h} '
+              f'(image {pil_img.width}×{pil_img.height})', flush=True)
+        return x, y, w, h
+
+    except Exception as e:
+        print(f'[face-detect] error: {e}', flush=True)
+        return None
+
+
 def _compose_image(image_url, width=1200, height=700):
     """Download image, smart-crop to target dimensions, return base64 PNG.
 
-    For portrait-orientation sources (taller than wide), anchors the vertical
-    crop to the top of the image — faces/heads stay in frame instead of being
-    centre-cropped out.  For landscape sources, centres horizontally as before.
+    Portrait-orientation images (person photos) go through face detection:
+      • Face found  → crop centres on the face with shoulder room below
+      • No face     → fall back to aggressive top-35% crop
+    Landscape / square sources use a simple centre crop (no person framing needed).
     """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
@@ -1342,25 +1387,70 @@ def _compose_image(image_url, width=1200, height=700):
 
     target_ratio = width / height
     src_w, src_h = img.size
-    src_ratio = src_w / src_h
-    is_portrait_src = src_h > src_w   # taller than wide → likely has a person
+    src_ratio    = src_w / src_h
+    is_portrait  = src_h > src_w   # taller than wide → likely a person photo
 
     if src_ratio > target_ratio:
-        # Source wider than target → centre-crop width, keep full height
+        # ── Landscape wider than target: centre-crop width ────────────────────
         new_w = int(src_h * target_ratio)
         left  = (src_w - new_w) // 2
         img   = img.crop((left, 0, left + new_w, src_h))
-    elif is_portrait_src:
-        # Portrait source (person photo) — take only the top 35% of the image
-        # height so we always frame head + shoulders (bust shot), regardless of
-        # whether Pexels returned a headshot or a full-body photo.
-        crop_h = int(src_h * 0.35)           # top 35% of height
-        crop_w = int(crop_h * target_ratio)   # width to match 1200:700 ratio
-        crop_w = min(crop_w, src_w)           # never exceed actual width
-        left   = (src_w - crop_w) // 2       # centre horizontally
-        img    = img.crop((left, 0, left + crop_w, crop_h))
+
+    elif is_portrait:
+        # ── Portrait source: try face-detection first ─────────────────────────
+        face = _detect_face_box(img)
+
+        if face:
+            fx, fy, fw, fh = face
+
+            # Build a crop that shows the face plus generous shoulder/chest room.
+            # Expand the face box: 30% above for forehead/hair, 200% below for
+            # shoulders, horizontally centred with 60% padding each side.
+            pad_top    = int(fh * 0.30)
+            pad_bottom = int(fh * 2.00)   # room for shoulders + chest
+            pad_side   = int(fw * 0.60)
+
+            crop_y1 = max(0, fy - pad_top)
+            crop_y2 = min(src_h, fy + fh + pad_bottom)
+            crop_x1 = max(0, fx - pad_side)
+            crop_x2 = min(src_w, fx + fw + pad_side)
+
+            # Enforce target aspect ratio (1200:700) around the face centre
+            crop_cx = (crop_x1 + crop_x2) // 2
+            crop_cy = (crop_y1 + crop_y2) // 2
+            crop_h  = crop_y2 - crop_y1
+            crop_w  = int(crop_h * target_ratio)
+
+            # If the ratio-correct width is wider than what we have, expand height
+            if crop_w > src_w:
+                crop_w = src_w
+                crop_h = int(crop_w / target_ratio)
+
+            half_w = crop_w // 2
+            half_h = crop_h // 2
+
+            x1 = max(0, crop_cx - half_w)
+            x2 = min(src_w, x1 + crop_w)
+            x1 = max(0, x2 - crop_w)   # re-clamp if right edge hit boundary
+
+            y1 = max(0, crop_cy - half_h)
+            y2 = min(src_h, y1 + crop_h)
+            y1 = max(0, y2 - crop_h)
+
+            img = img.crop((x1, y1, x2, y2))
+            print(f'[face-crop] crop=({x1},{y1},{x2},{y2})', flush=True)
+
+        else:
+            # ── No face detected: fall back to top-35% crop ──────────────────
+            print('[face-crop] no face found, using top-35% fallback', flush=True)
+            crop_h = int(src_h * 0.35)
+            crop_w = int(crop_h * target_ratio)
+            crop_w = min(crop_w, src_w)
+            left   = (src_w - crop_w) // 2
+            img    = img.crop((left, 0, left + crop_w, crop_h))
+
     else:
-        # Landscape / square source → centre-crop height
+        # ── Landscape / square source: centre-crop height ─────────────────────
         new_h = int(src_w / target_ratio)
         top   = (src_h - new_h) // 2
         img   = img.crop((0, top, src_w, top + new_h))

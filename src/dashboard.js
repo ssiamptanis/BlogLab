@@ -1022,9 +1022,16 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
     // always passes with the user's live session token
     try {
       const user = await _getDashUser()
+      // Ensure we have the user ID (needed for RLS — user_id must equal auth.uid())
+      let userId = _currentUserId
+      if (!userId) {
+        const { data: { session } } = await supabase.auth.getSession()
+        userId = session?.user?.id || null
+      }
       const { data: record, error } = await supabase
         .from('templates')
         .insert({
+          user_id:       userId,
           name:          blogMeta.title,
           status:        'saved',
           folder_id:     null,
