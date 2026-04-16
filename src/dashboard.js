@@ -947,7 +947,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
           body: JSON.stringify({ imageUrl: card.dataset.url })
         })
         overlay.remove()
-        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex)
+        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, _attempt)
       } catch (err) {
         const errEl = overlay.querySelector('#thumb-picker-error')
         errEl.textContent = 'Failed to compose image — try another'
@@ -959,7 +959,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
 }
 
 // ── Thumbnail result (download + next) ───────────────────────────────────────
-function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0) {
+function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const isBulk    = csvRows && csvRows.length > 1
   const hasNext   = isBulk && currentIndex < csvRows.length - 1
@@ -999,11 +999,12 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
 
   overlay.querySelector('#thumb-result-back').addEventListener('click', () => {
     overlay.remove()
-    // Re-generate options for this same row
-    apiFetch('/api/thumbnail/generate', {
-      method: 'POST', body: JSON.stringify(blogMeta)
-    }).then(result => showThumbnailPicker(blogMeta, result, csvRows, currentIndex))
-      .catch(() => showBlogThumbnailForm(csvRows, currentIndex))
+    // Reopen the same picker — no new API call needed
+    if (pickerResult) {
+      showThumbnailPicker(blogMeta, pickerResult, csvRows, currentIndex, pickerAttempt)
+    } else {
+      showBlogThumbnailForm(csvRows, currentIndex)
+    }
   })
 
   overlay.querySelector('#thumb-result-download').addEventListener('click', async (e) => {
