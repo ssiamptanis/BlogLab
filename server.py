@@ -1150,26 +1150,27 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
     """
     rng = random.Random(attempt * 31337)
 
-    # ── Audiences: always a SINGLE person facing the camera, plain background ──
+    # ── Audiences: bust/headshot of ONE person facing camera, plain background ──
     if category == 'audiences':
         # Pull up to 2 short keywords from the title for demographic relevance
-        # (include short words like "gen", "z", "men" that the main extractor skips)
+        # (allow short words like "gen", "z", "men" that the main extractor strips)
+        skip = {'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'how', 'why', 'what'}
         raw_title_words = [
             w.strip('.,!?:;"\'/()').lower()
             for w in title.replace('-', ' ').split()
             if len(w.strip('.,!?:;"\'/()')) >= 2
-               and w.strip('.,!?:;"\'/()').lower() not in
-               {'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are'}
+            and w.strip('.,!?:;"\'/()').lower() not in skip
         ][:2]
 
-        # Rotate through visual style variants per attempt
+        # Each variant uses specific photography framing terms Pexels understands:
+        # bust, headshot, upper body = head + shoulders in frame (what the user wants)
         style_variants = [
-            'solid color background single person facing camera',
-            'plain backdrop studio portrait one person front view',
-            'clean simple background single individual looking at camera',
-            'bright solid background close up portrait facing forward',
-            'pastel background one person headshot front facing',
-            'minimal background individual portrait looking straight ahead',
+            'headshot bust single person facing camera solid color background',
+            'upper body portrait one person looking at camera plain backdrop',
+            'bust shot single individual front facing clean solid background',
+            'headshot shoulders one person direct gaze simple plain background',
+            'chest up portrait single person face forward solid backdrop',
+            'studio headshot bust one individual looking straight at camera',
         ]
         style = style_variants[attempt % len(style_variants)]
 
@@ -1353,9 +1354,8 @@ def _compose_image(image_url, width=1200, height=700):
         # Source is narrower than target ratio → crop height
         new_h = int(src_w / target_ratio)
         if is_portrait_src:
-            # Anchor to top: 5% breathing room above the face, never out of bounds
-            top = min(int(src_h * 0.05), src_h - new_h)
-            top = max(0, top)
+            # Anchor hard to the top — never cut the head/face
+            top = 0
         else:
             # Landscape/square source: centre crop is safe
             top = (src_h - new_h) // 2
@@ -1432,7 +1432,11 @@ def compose_thumbnail():
 @app.route('/api/thumbnail/save', methods=['POST'])
 @require_auth
 def save_thumbnail():
-    """Re-compose a thumbnail from the source URL, upload to storage, create template record."""
+    """Create a dashboard record for a completed thumbnail.
+    Stores the source image URL directly — no re-upload needed since the
+    composed PNG is already on the user's machine from the download step.
+    Pexels CDN URLs are permanent and public so they work fine as preview URLs.
+    """
     data      = request.get_json(force=True) or {}
     title     = (data.get('title') or 'Untitled').strip()
     image_url = (data.get('imageUrl') or '').strip()
@@ -1441,33 +1445,6 @@ def save_thumbnail():
     if not image_url:
         return jsonify({'error': 'imageUrl is required'}), 400
 
-    # Re-compose the 1200×700 PNG from the original source URL
-    try:
-        b64 = _compose_image(image_url)
-        png_bytes = base64.b64decode(b64)
-    except Exception as e:
-        return jsonify({'error': f'Image compose failed: {e}'}), 500
-
-    # Use same path prefix as user uploads so RLS definitely allows it
-    safe_title = ''.join(c if c.isalnum() or c in '-_ ' else '_' for c in title).strip().replace(' ', '_')[:60]
-    ts = int(time.time())
-    storage_path = f"{g.user_id}/thumbnails/{ts}_{safe_title}.png"
-
-    try:
-        _sb.storage.from_("abx-images").upload(
-            path=storage_path,
-            file=png_bytes,
-            file_options={"content-type": "image/png", "upsert": "true"},
-        )
-        url_res    = _sb.storage.from_("abx-images").create_signed_url(storage_path, 60 * 60 * 24 * 365)
-        signed_url = _signed_url(url_res)
-        if not signed_url:
-            raise ValueError("Empty signed URL returned from storage")
-    except Exception as e:
-        print(f'[save_thumbnail] storage error: {e}', flush=True)
-        return jsonify({'error': f'Storage upload failed: {e}'}), 500
-
-    # Create template record so it appears on the dashboard
     try:
         sb = _sb_user()
         res = sb.table("templates").insert({
@@ -1476,17 +1453,17 @@ def save_thumbnail():
             "status":        "saved",
             "folder_id":     None,
             "template_type": "blog-thumbnail",
-            "doc":           {"imageUrl": signed_url, "blogMeta": blog_meta},
+            "doc":           {"imageUrl": image_url, "blogMeta": blog_meta},
             "block_count":   0,
             "block_types":   [],
         }).execute()
         _templates_cache_invalidate(g.user_id)
         record = res.data[0]
-        record["doc_image_url"] = signed_url
+        record["doc_image_url"] = image_url
         return jsonify({'ok': True, 'template': record}), 201
     except Exception as e:
-        print(f'[save_thumbnail] template insert error: {e}', flush=True)
-        return jsonify({'error': f'Template save failed: {e}'}), 500
+        print(f'[save_thumbnail] error: {e}', flush=True)
+        return jsonify({'error': f'Save failed: {e}'}), 500
 
 
 if __name__ == "__main__":
