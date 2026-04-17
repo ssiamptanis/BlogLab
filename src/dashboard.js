@@ -166,8 +166,8 @@ function cardHTML(t) {
       </div>
       <div class="tmpl-card-actions">
         ${mine ? `
-          <button class="tmpl-action-btn" data-action="rename"    data-id="${t.id}" title="Rename">${lucideSVG('pencil', 14, 'currentColor')}</button>
-          <button class="tmpl-action-btn" data-action="duplicate" data-id="${t.id}" title="Duplicate">${lucideSVG('copy', 14, 'currentColor')}</button>
+          <button class="tmpl-action-btn" data-action="rename" data-id="${t.id}" title="Rename">${lucideSVG('pencil', 14, 'currentColor')}</button>
+          ${!isBlogThumb ? `<button class="tmpl-action-btn" data-action="duplicate" data-id="${t.id}" title="Duplicate">${lucideSVG('copy', 14, 'currentColor')}</button>` : ''}
           <button class="tmpl-action-btn danger" data-action="delete" data-id="${t.id}" title="Delete">${lucideSVG('trash-2', 14, 'currentColor')}</button>
         ` : `
           <button class="tmpl-action-btn" data-action="copy-to-mine" data-id="${t.id}" title="Make a copy">${lucideSVG('copy-plus', 14, 'currentColor')} Make a copy</button>
