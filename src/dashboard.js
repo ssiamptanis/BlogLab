@@ -1119,14 +1119,25 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
       .adj-slider {
         width: 100%;
         margin-bottom: 10px;
-        accent-color: #FF0077;
         appearance: none;
         -webkit-appearance: none;
         height: 4px;
         border-radius: 2px;
         outline: none;
         cursor: pointer;
-        background: rgba(255,255,255,0.15);
+        background: transparent;
+      }
+      /* WebKit — filled track via CSS variable set by JS */
+      .adj-slider::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(
+          to right,
+          #FF0077 0%,
+          #FF0077 var(--pct, 50%),
+          rgba(255,255,255,0.15) var(--pct, 50%),
+          rgba(255,255,255,0.15) 100%
+        );
       }
       .adj-slider::-webkit-slider-thumb {
         -webkit-appearance: none;
@@ -1135,6 +1146,18 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
         border-radius: 50%;
         background: #FF0077;
         cursor: pointer;
+        margin-top: -5px; /* centre 14px thumb on 4px track */
+      }
+      /* Firefox — native progress fill */
+      .adj-slider::-moz-range-track {
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        height: 4px;
+      }
+      .adj-slider::-moz-range-progress {
+        background: #FF0077;
+        border-radius: 2px;
+        height: 4px;
       }
       .adj-slider::-moz-range-thumb {
         width: 14px;
@@ -1143,16 +1166,6 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
         background: #FF0077;
         cursor: pointer;
         border: none;
-      }
-      .adj-slider::-webkit-slider-runnable-track {
-        background: rgba(255,255,255,0.15);
-        border-radius: 2px;
-        height: 4px;
-      }
-      .adj-slider::-moz-range-track {
-        background: rgba(255,255,255,0.15);
-        border-radius: 2px;
-        height: 4px;
       }
     </style>
     <div class="tmpl-picker-modal blog-form-modal" style="max-width:820px;width:92vw">
@@ -1170,7 +1183,7 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:4px">
 
           <div>
-            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:var(--text-secondary)">Image adjustments</p>
+            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:#ffffff">Image adjustments</p>
             <label class="blog-form-label">Size — <span id="adj-ps-val">100%</span></label>
             <input type="range" class="adj-slider" id="adj-ps" min="40" max="180" value="100">
             <label class="blog-form-label">Left / Right — <span id="adj-px-val">0</span></label>
@@ -1180,7 +1193,7 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
           </div>
 
           <div>
-            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:var(--text-secondary)">Logo adjustments</p>
+            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:#ffffff">Logo adjustments</p>
             <label class="blog-form-label">Size — <span id="adj-ls-val">100%</span></label>
             <input type="range" class="adj-slider" id="adj-ls" min="20" max="200" value="100">
             <label class="blog-form-label">Left / Right — <span id="adj-lx-val">0</span></label>
@@ -1192,7 +1205,7 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
         </div>
 
         <div style="display:flex;align-items:center;gap:14px">
-          <span style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap">Background colour</span>
+          <span style="font-size:13px;font-weight:600;color:#ffffff;white-space:nowrap">Background colour</span>
           <div style="display:flex;gap:10px">
             <button class="adj-bg-btn" data-color="black"
               style="border:2px solid ${currentBg === 'black' ? '#FF0077' : 'transparent'};background:#000000;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
@@ -1257,6 +1270,15 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
   personImg.src    = personDataUrl
   logoImg.src      = logoDataUrl
 
+  // Update the CSS --pct variable so the WebKit track fill follows the thumb
+  function syncFill(input) {
+    const min = parseFloat(input.min) || 0
+    const max = parseFloat(input.max) || 100
+    const val = parseFloat(input.value)
+    const pct = ((val - min) / (max - min)) * 100
+    input.style.setProperty('--pct', `${pct}%`)
+  }
+
   // Wire up sliders
   const sliderDefs = [
     ['#adj-ps', '#adj-ps-val', v => { personScale = v / 100 }, v => `${v}%`],
@@ -1269,10 +1291,12 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
   sliderDefs.forEach(([inputSel, labelSel, setter, fmt]) => {
     const input = overlay.querySelector(inputSel)
     const label = overlay.querySelector(labelSel)
+    syncFill(input)   // set initial fill position
     input.addEventListener('input', () => {
       const v = parseInt(input.value, 10)
       label.textContent = fmt(v)
       setter(v)
+      syncFill(input)
       draw()
     })
   })
