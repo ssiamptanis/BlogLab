@@ -3580,15 +3580,31 @@ body, html { overflow-x: hidden; }
 
 /* ── Thumbnail picker ────────────────────────────────────────── */
 .thumb-picker-modal {
-  width: 900px !important;
+  width: 1160px !important;
   max-width: 96vw;
 }
 
 .thumb-picker-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
   margin: 8px 0;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.2) transparent;
+}
+
+.thumb-picker-grid::-webkit-scrollbar {
+  width: 5px;
+}
+.thumb-picker-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thumb-picker-grid::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
 }
 
 .thumb-picker-card {

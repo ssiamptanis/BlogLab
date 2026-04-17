@@ -906,7 +906,10 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
         ${result.options.map((opt, i) => `
           <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
             <img class="thumb-picker-img" src="${opt.preview || opt.url}" alt="Option ${i + 1}" loading="lazy" />
-            <div class="thumb-picker-label">Option ${i + 1}</div>
+            <div class="thumb-picker-label" style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px 7px;width:100%">
+              <span>Option ${i + 1}</span>
+              <span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em">${opt.source || 'pexels'}</span>
+            </div>
           </button>
         `).join('')}
       </div>

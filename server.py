@@ -1109,6 +1109,7 @@ FIGMA_CATEGORIES   = {'strategy', 'product'}
 SPECIAL_CATEGORIES = {'talk data to me'}
 
 PEXELS_API_KEY            = os.environ.get('PEXELS_API_KEY', '')
+UNSPLASH_ACCESS_KEY       = os.environ.get('UNSPLASH_ACCESS_KEY', '')
 FIGMA_TOKEN_KEY           = os.environ.get('FIGMA_TOKEN', '')
 GEMINI_API_KEY            = os.environ.get('GEMINI_API_KEY', '')
 FIGMA_THUMBNAILS_FILE_KEY = '0b47ipE59eoQ72I7ceHkPd'
@@ -1322,6 +1323,59 @@ def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
              'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
 
 
+def _search_unsplash(query, count=10, exclude_ids=None, attempt=0):
+    """Search Unsplash and return image options. Returns [] if key not configured."""
+    if not UNSPLASH_ACCESS_KEY:
+        return []
+
+    is_portrait_query = any(w in query for w in ('portrait', 'headshot', 'face'))
+    orientation = 'portrait' if is_portrait_query else 'landscape'
+    page = (attempt // 2) + 1
+
+    try:
+        res = _requests.get(
+            'https://api.unsplash.com/search/photos',
+            headers={'Authorization': f'Client-ID {UNSPLASH_ACCESS_KEY}'},
+            params={'query': query, 'per_page': 20, 'page': page, 'orientation': orientation},
+            timeout=10
+        )
+        res.raise_for_status()
+        photos = res.json().get('results', [])
+    except Exception as e:
+        print(f'[unsplash] search failed: {e}', flush=True)
+        return []
+
+    if exclude_ids:
+        photos = [p for p in photos if p['id'] not in (exclude_ids or [])]
+
+    # Filter B&W using Unsplash's `color` field (same logic as Pexels)
+    def _is_color(p):
+        hex_col = (p.get('color') or '#888888').lstrip('#')
+        if len(hex_col) != 6:
+            return True
+        r, g, b = int(hex_col[0:2], 16), int(hex_col[2:4], 16), int(hex_col[4:6], 16)
+        return max(abs(r - g), abs(g - b), abs(r - b)) >= 12
+
+    photos = [p for p in photos if _is_color(p)]
+
+    # Portrait: drop very narrow images (likely full-body shots)
+    if is_portrait_query:
+        photos = [p for p in photos
+                  if (p.get('width', 1) / max(p.get('height', 1), 1)) >= 0.45]
+        photos.sort(key=lambda p: p['width'] / max(p['height'], 1), reverse=True)
+
+    return [
+        {
+            'id':           p['id'],
+            'url':          p['urls']['regular'],   # 1080px — plenty for 1200×700 compose
+            'preview':      p['urls']['small'],      # ~400px — fast for picker grid
+            'photographer': p['user']['name'],
+            'source':       'unsplash',
+        }
+        for p in photos[:count]
+    ]
+
+
 def _get_figma_frames(page_name, count=3, exclude_ids=None):
     """Fetch random frames from a named Figma page, with caching."""
     global _figma_pages_cache
@@ -1426,14 +1480,27 @@ def generate_thumbnail_options():
     # Build search query (varies by attempt)
     query = _build_search_query(title, meta_desc, subtitles, category, attempt)
 
-    # Pexels categories
+    # Pexels + Unsplash categories — fetch both in parallel, interleave, return 20
     if category in PEXELS_CATEGORIES:
         try:
-            options = _search_pexels(query, count=3, exclude_ids=exclude_ids, attempt=attempt)
+            from concurrent.futures import ThreadPoolExecutor
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                f_pex = pool.submit(_search_pexels,   query, 10, exclude_ids, attempt)
+                f_unp = pool.submit(_search_unsplash,  query, 10, exclude_ids, attempt)
+                pex_opts = f_pex.result()
+                unp_opts = f_unp.result()
+
+            # Interleave so Pexels and Unsplash results alternate in the picker
+            options = []
+            for i in range(max(len(pex_opts), len(unp_opts))):
+                if i < len(pex_opts): options.append(pex_opts[i])
+                if i < len(unp_opts): options.append(unp_opts[i])
+            options = options[:20]
+
             return jsonify({'type': 'pexels', 'category': category,
                             'search_query': query, 'options': options})
         except Exception as e:
-            return jsonify({'error': f'Pexels search failed: {e}'}), 500
+            return jsonify({'error': f'Image search failed: {e}'}), 500
 
     # Figma categories
     if category in FIGMA_CATEGORIES:
