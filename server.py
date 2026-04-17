@@ -1559,11 +1559,17 @@ def generate_talkdata_thumbnail():
         bg_rgb = color_map.get(bg_color, (16, 23, 32))
         W, H   = 1200, 700
 
-        # ── Remove backgrounds ─────────────────────────────────────────────────
-        print('[talkdata] removing person background…', flush=True)
-        person_img = _remove_bg(person_file.read())
-        print('[talkdata] removing logo background…', flush=True)
-        logo_img   = _remove_bg(logo_file.read())
+        # ── Remove backgrounds in parallel (saves ~10-15s vs sequential) ────────
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        person_bytes = person_file.read()
+        logo_bytes   = logo_file.read()
+        print('[talkdata] removing backgrounds in parallel…', flush=True)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            f_person = pool.submit(_remove_bg, person_bytes)
+            f_logo   = pool.submit(_remove_bg, logo_bytes)
+            person_img = f_person.result()
+            logo_img   = f_logo.result()
+        print('[talkdata] backgrounds removed', flush=True)
 
         # ── Canvas ────────────────────────────────────────────────────────────
         canvas = Image.new('RGB', (W, H), bg_rgb)
