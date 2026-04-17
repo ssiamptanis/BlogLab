@@ -1506,24 +1506,25 @@ def save_thumbnail():
 
 # ── Talk data to me — background removal + composition ───────────────────────
 
-_rembg_session = None
-
-def _get_rembg_session():
-    """Lazy-load and cache the rembg u2netp model (fast, 4.7 MB — fits Render free tier CPU)."""
-    global _rembg_session
-    if _rembg_session is None:
-        from rembg import new_session as _new_session
-        _rembg_session = _new_session('u2netp')
-        print('[rembg] model loaded: u2netp', flush=True)
-    return _rembg_session
+REMOVE_BG_API_KEY = os.environ.get('REMOVE_BG_API_KEY', '')
 
 
 def _remove_bg(img_bytes):
-    """Remove background from raw image bytes. Returns RGBA PIL Image."""
-    from rembg import remove as _rembg_remove
-    session  = _get_rembg_session()
-    out_bytes = _rembg_remove(img_bytes, session=session)
-    return Image.open(io.BytesIO(out_bytes)).convert('RGBA')
+    """Remove background via remove.bg API. Returns RGBA PIL Image."""
+    if not REMOVE_BG_API_KEY:
+        raise RuntimeError('REMOVE_BG_API_KEY not set')
+
+    res = _requests.post(
+        'https://api.remove.bg/v1.0/removebg',
+        headers={'X-Api-Key': REMOVE_BG_API_KEY},
+        files={'image_file': ('image.png', img_bytes, 'image/png')},
+        data={'size': 'auto'},
+        timeout=30,
+    )
+    if res.status_code != 200:
+        raise RuntimeError(f'remove.bg error {res.status_code}: {res.text[:200]}')
+
+    return Image.open(io.BytesIO(res.content)).convert('RGBA')
 
 
 @app.route('/api/thumbnail/talkdata', methods=['POST'])
