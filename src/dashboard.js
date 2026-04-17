@@ -1508,9 +1508,9 @@ function _showBlogThumbnailCardDialog(tmpl) {
       <div class="thumb-picker-actions">
         <button class="blog-form-cancel" id="thumb-card-close2">${lucideSVG('x', 14, 'currentColor')} Close</button>
         ${imageUrl ? `
-          <a class="blog-form-submit" href="${escHtml(imageUrl)}" download="${safeTitle}_thumbnail.png" target="_blank">
+          <button class="blog-form-submit" id="thumb-card-download">
             ${lucideSVG('download', 14, 'currentColor')} Download PNG
-          </a>` : ''}
+          </button>` : ''}
       </div>
     </div>
   `
@@ -1518,6 +1518,29 @@ function _showBlogThumbnailCardDialog(tmpl) {
   overlay.querySelector('#thumb-card-close').addEventListener('click',  () => overlay.remove())
   overlay.querySelector('#thumb-card-close2').addEventListener('click', () => overlay.remove())
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+
+  overlay.querySelector('#thumb-card-download')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget
+    btn.disabled = true
+    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
+    try {
+      const res = await apiFetch('/api/thumbnail/compose', {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl })
+      })
+      if (res.error) throw new Error(res.error)
+      const a = document.createElement('a')
+      a.href     = res.image
+      a.download = `${safeTitle}_thumbnail.png`
+      a.click()
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
+    } catch (err) {
+      showToast(`Download failed: ${err.message}`, 'error')
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
+    }
+  })
 }
 
 async function moveTemplateToFolder(templateId, folderId) {
