@@ -1098,7 +1098,7 @@ def test_figma():
 import io
 import random
 import base64
-from PIL import Image
+from PIL import Image, ImageFilter, ImageEnhance
 
 VALID_CATEGORIES = {
     'audiences', 'consumer behaviour', 'digital trends',
@@ -1363,16 +1363,14 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
 
 
 def _compose_image(image_url, width=1200, height=700):
-    """Download image, crop to target dimensions, return base64 PNG.
+    """Download image, fit to canvas, return base64 PNG.
 
-    Portrait sources (person photos): take the full width from the top.
-    The crop height is derived from the target aspect ratio, so the result
-    is always the correct shape. Starting from y=0 ensures the head is
-    always in frame — portrait photos on Pexels are composed with the
-    subject at the top.
+    Portrait sources (person photos for Audiences):
+      Scale to fit the full canvas height so the entire person is visible.
+      Fill the left/right letterbox bands with a heavily blurred + darkened
+      version of the same image — no cropping of the subject at all.
 
-    Landscape sources wider than target: centre-crop horizontally.
-    Square / landscape sources narrower than target: centre-crop vertically.
+    Landscape sources: centre-crop to fill the canvas as before.
     """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
@@ -1384,24 +1382,46 @@ def _compose_image(image_url, width=1200, height=700):
     is_portrait  = src_h > src_w
 
     if is_portrait:
-        # Full width, height derived from target ratio, anchored to top
-        crop_h = int(src_w / target_ratio)
-        crop_h = min(crop_h, src_h)
-        img = img.crop((0, 0, src_w, crop_h))
+        # ── Portrait: fit full image within canvas, blurred bg for side bands ──
+
+        # Scale the portrait so it fills the canvas height entirely
+        fit_h = height
+        fit_w = int(src_w * fit_h / src_h)
+
+        # Build background: scale to fill full canvas width, heavy blur + dim
+        bg_w  = width
+        bg_h  = int(src_h * bg_w / src_w)
+        bg    = img.resize((bg_w, bg_h), Image.LANCZOS)
+        # Centre-crop background vertically to canvas height
+        bg_top = (bg_h - height) // 2
+        bg_top = max(0, bg_top)
+        bg = bg.crop((0, bg_top, bg_w, bg_top + height))
+        bg = bg.filter(ImageFilter.GaussianBlur(radius=30))
+        bg = ImageEnhance.Brightness(bg).enhance(0.5)
+
+        # Scale and paste the full portrait centred on the background
+        portrait = img.resize((fit_w, fit_h), Image.LANCZOS)
+        paste_x  = (width - fit_w) // 2
+        bg.paste(portrait, (paste_x, 0))
+        img = bg
 
     elif src_ratio > target_ratio:
         # Landscape wider than target: centre-crop width
         new_w = int(src_h * target_ratio)
         left  = (src_w - new_w) // 2
         img   = img.crop((left, 0, left + new_w, src_h))
+        img   = img.resize((width, height), Image.LANCZOS)
 
     else:
         # Square / landscape narrower than target: centre-crop height
         new_h = int(src_w / target_ratio)
         top   = (src_h - new_h) // 2
         img   = img.crop((0, top, src_w, top + new_h))
+        img   = img.resize((width, height), Image.LANCZOS)
 
-    img = img.resize((width, height), Image.LANCZOS)
+    if img.size != (width, height):
+        img = img.resize((width, height), Image.LANCZOS)
+
     buf = io.BytesIO()
     img.save(buf, format='PNG', optimize=True)
     buf.seek(0)

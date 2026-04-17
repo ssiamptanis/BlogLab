@@ -970,7 +970,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
   })
 }
 
-// ── Thumbnail result (download + next) ───────────────────────────────────────
+// ── Thumbnail result (save / download / next) ────────────────────────────────
 function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0, sourceImageUrl = null) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const isBulk    = csvRows && csvRows.length > 1
@@ -994,6 +994,9 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
       <div class="thumb-picker-actions">
         <button class="blog-form-cancel" id="thumb-result-back">${lucideSVG('arrow-left', 14, 'currentColor')} Choose different</button>
         <div style="display:flex;gap:10px">
+          <button class="blog-form-submit" id="thumb-result-save" style="background:#2a7a4b">
+            ${lucideSVG('bookmark', 14, 'currentColor')} Save to dashboard
+          </button>
           <button class="blog-form-submit" id="thumb-result-download">
             ${lucideSVG('download', 14, 'currentColor')} Download PNG
           </button>
@@ -1011,7 +1014,6 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
 
   overlay.querySelector('#thumb-result-back').addEventListener('click', () => {
     overlay.remove()
-    // Reopen the same picker — no new API call needed
     if (pickerResult) {
       showThumbnailPicker(blogMeta, pickerResult, csvRows, currentIndex, pickerAttempt)
     } else {
@@ -1019,16 +1021,14 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
     }
   })
 
-  overlay.querySelector('#thumb-result-download').addEventListener('click', async (e) => {
+  // ── Save to dashboard ────────────────────────────────────────────────────────
+  overlay.querySelector('#thumb-result-save').addEventListener('click', async (e) => {
     const btn = e.currentTarget
     btn.disabled = true
     btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Saving…`
 
-    // Save directly via Supabase JS client — bypasses Flask entirely so RLS
-    // always passes with the user's live session token
     try {
       const user = await _getDashUser()
-      // Ensure we have the user ID (needed for RLS — user_id must equal auth.uid())
       let userId = _currentUserId
       if (!userId) {
         const { data: { session } } = await supabase.auth.getSession()
@@ -1041,7 +1041,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           name:          blogMeta.title,
           status:        'saved',
           folder_id:     null,
-          template_type: 'blog-thumbnail', // ensure this value is in the DB check constraint
+          template_type: 'blog-thumbnail',
           doc:           { imageUrl: sourceImageUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
           block_count:   0,
           block_types:   [],
@@ -1051,7 +1051,6 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
 
       if (error) throw new Error(error.message)
 
-      // Push new card to top of dashboard immediately
       _templates.unshift({
         ...record,
         doc_image_url:     sourceImageUrl || '',
@@ -1060,18 +1059,20 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
       })
       refreshGrid()
       showToast(`"${blogMeta.title}" saved to dashboard`)
+      btn.innerHTML = `${lucideSVG('check', 14, 'currentColor')} Saved`
     } catch (err) {
       showToast(`Save failed: ${err.message}`, 'error')
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('bookmark', 14, 'currentColor')} Save to dashboard`
     }
+  })
 
-    // Always trigger browser download regardless of save result
+  // ── Download PNG ─────────────────────────────────────────────────────────────
+  overlay.querySelector('#thumb-result-download').addEventListener('click', () => {
     const a = document.createElement('a')
     a.href     = imageDataUrl
     a.download = `${safeTitle}_thumbnail.png`
     a.click()
-
-    btn.disabled = false
-    btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
   })
 
   overlay.querySelector('#thumb-result-next')?.addEventListener('click', () => {
