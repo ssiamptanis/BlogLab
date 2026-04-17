@@ -310,6 +310,7 @@ def list_templates():
         t["doc_author"]        = doc.get("docAuthor", "")
         t["doc_author_avatar"] = doc.get("docAuthorAvatar", "")
         t["doc_image_url"]     = doc.get("previewJpeg") or doc.get("imageUrl", "")
+        t["doc_category"]      = (doc.get("blogMeta") or {}).get("category", "")
         templates.append(t)
     data = {"templates": templates, "folders": folders_res.data}
     _templates_cache_set(g.user_id, data)
@@ -1323,7 +1324,7 @@ def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
              'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
 
 
-def _search_unsplash(query, count=10, exclude_ids=None, attempt=0):
+def _search_unsplash(query, count=12, exclude_ids=None, attempt=0):
     """Search Unsplash and return image options. Returns [] if key not configured."""
     if not UNSPLASH_ACCESS_KEY:
         return []
@@ -1335,12 +1336,16 @@ def _search_unsplash(query, count=10, exclude_ids=None, attempt=0):
     try:
         res = _requests.get(
             'https://api.unsplash.com/search/photos',
-            headers={'Authorization': f'Client-ID {UNSPLASH_ACCESS_KEY}'},
-            params={'query': query, 'per_page': 20, 'page': page, 'orientation': orientation},
+            headers={
+                'Authorization':  f'Client-ID {UNSPLASH_ACCESS_KEY}',
+                'Accept-Version': 'v1',
+            },
+            params={'query': query, 'per_page': 30, 'page': page, 'orientation': orientation},
             timeout=10
         )
         res.raise_for_status()
         photos = res.json().get('results', [])
+        print(f'[unsplash] got {len(photos)} results for "{query}"', flush=True)
     except Exception as e:
         print(f'[unsplash] search failed: {e}', flush=True)
         return []
@@ -1485,8 +1490,8 @@ def generate_thumbnail_options():
         try:
             from concurrent.futures import ThreadPoolExecutor
             with ThreadPoolExecutor(max_workers=2) as pool:
-                f_pex = pool.submit(_search_pexels,   query, 10, exclude_ids, attempt)
-                f_unp = pool.submit(_search_unsplash,  query, 10, exclude_ids, attempt)
+                f_pex = pool.submit(_search_pexels,   query, 12, exclude_ids, attempt)
+                f_unp = pool.submit(_search_unsplash,  query, 12, exclude_ids, attempt)
                 pex_opts = f_pex.result()
                 unp_opts = f_unp.result()
 

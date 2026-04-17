@@ -135,9 +135,12 @@ function _authorAvatarHTML(name, avatarUrl) {
 
 function cardHTML(t) {
   const folder = t.folder_id ? getFolderName(t.folder_id) : null
-  const statusClass = t.status === 'saved' ? 'tmpl-status-saved' : 'tmpl-status-draft'
-  const statusLabel = t.status === 'saved' ? 'Saved' : 'Draft'
   const isBlogThumb = t.template_type === 'blog-thumbnail'
+  const statusClass = t.status === 'saved' ? 'tmpl-status-saved' : 'tmpl-status-draft'
+  const rawCategory = (t.doc_category || '').trim()
+  const statusLabel = isBlogThumb && rawCategory
+    ? rawCategory.replace(/\b\w/g, c => c.toUpperCase())   // title-case
+    : t.status === 'saved' ? 'Saved' : 'Draft'
   const typeLabel = isBlogThumb ? 'Blog Thumbnail' : inferTemplateTypeLabel(t.block_types)
   const mine = isOwner(t)
   // Fall back to current user's profile for older docs that predate author stamping
@@ -1241,7 +1244,7 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
   overlay.querySelector('#iadj-back').addEventListener('click', () => {
     overlay.remove()
-    showThumbPicker(blogMeta, result, csvRows, currentIndex, attempt)
+    showThumbnailPicker(blogMeta, result, csvRows, currentIndex, attempt)
   })
 
   // Use this → server composes with user's params
