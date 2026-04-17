@@ -1514,6 +1514,18 @@ def _remove_bg(img_bytes):
     if not REMOVE_BG_API_KEY:
         raise RuntimeError('REMOVE_BG_API_KEY not set')
 
+    # remove.bg rejects images over 50MP — downscale to ≤25MP to stay well clear
+    MAX_PIXELS = 25_000_000
+    src = Image.open(io.BytesIO(img_bytes))
+    if src.width * src.height > MAX_PIXELS:
+        scale = (MAX_PIXELS / (src.width * src.height)) ** 0.5
+        new_w = int(src.width  * scale)
+        new_h = int(src.height * scale)
+        src = src.resize((new_w, new_h), Image.LANCZOS)
+        buf = io.BytesIO()
+        src.save(buf, format='PNG')
+        img_bytes = buf.getvalue()
+
     res = _requests.post(
         'https://api.remove.bg/v1.0/removebg',
         headers={'X-Api-Key': REMOVE_BG_API_KEY},
