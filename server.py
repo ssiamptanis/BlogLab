@@ -1553,10 +1553,10 @@ def generate_talkdata_thumbnail():
 
     try:
         color_map = {
-            'black': (16,  23,  32),    # #101720
+            'black': (0,   0,   0),     # #000000
             'pink':  (255, 0,   119),   # #FF0077
         }
-        bg_rgb = color_map.get(bg_color, (16, 23, 32))
+        bg_rgb = color_map.get(bg_color, (0, 0, 0))
         W, H   = 1200, 700
 
         # ── Remove backgrounds in parallel (saves ~10-15s vs sequential) ────────
@@ -1608,11 +1608,25 @@ def generate_talkdata_thumbnail():
         print(f'[talkdata] logo: {lw_scaled}×{lh_scaled} at ({lx},{ly})', flush=True)
 
         # ── Output ────────────────────────────────────────────────────────────
-        buf = io.BytesIO()
-        canvas.save(buf, format='PNG', optimize=True)
-        buf.seek(0)
-        b64 = base64.b64encode(buf.read()).decode('utf-8')
-        return jsonify({'ok': True, 'image': f'data:image/png;base64,{b64}'})
+        def _to_b64_png(img):
+            b = io.BytesIO()
+            img.save(b, format='PNG', optimize=True)
+            b.seek(0)
+            return 'data:image/png;base64,' + base64.b64encode(b.read()).decode('utf-8')
+
+        return jsonify({
+            'ok':          True,
+            'image':       _to_b64_png(canvas),
+            # Cutout images so the frontend can re-compose without another API call
+            'personImage': _to_b64_png(person_resized),
+            'logoImage':   _to_b64_png(logo_resized),
+            # Default placement on the 1200×700 canvas
+            'defaults': {
+                'person': {'w': pw,        'h': ph,        'x': 0,  'y': py},
+                'logo':   {'w': lw_scaled, 'h': lh_scaled, 'x': lx, 'y': ly},
+                'bgColor': bg_color,
+            },
+        })
 
     except Exception as e:
         traceback.print_exc()

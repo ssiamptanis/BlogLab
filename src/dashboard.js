@@ -1096,6 +1096,171 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   })
 }
 
+// ── Talk data to me — adjustment screen ──────────────────────────────────────
+function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvRows, currentIndex) {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const W = 1200, H = 700
+
+  const BG_COLORS = { black: '#000000', pink: '#FF0077' }
+
+  // Mutable state — all offsets are in canvas pixels (1200×700 space)
+  let personScale = 1.0
+  let personOffX  = 0
+  let personOffY  = 0
+  let logoScale   = 1.0
+  let logoOffX    = 0
+  let logoOffY    = 0
+  let currentBg   = defaults.bgColor || 'black'
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal blog-form-modal" style="max-width:820px;width:92vw">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Adjust placement</h2>
+          <p class="tmpl-picker-subtitle">${escHtml(blogMeta.title)}</p>
+        </div>
+        <button class="tmpl-picker-close" id="adj-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="blog-form" style="gap:16px">
+
+        <canvas id="adj-canvas" style="width:100%;border-radius:6px;display:block;background:#000"></canvas>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:4px">
+
+          <div>
+            <p style="font-weight:600;font-size:13px;margin-bottom:12px;color:var(--text-primary)">Person</p>
+            <label class="blog-form-label">Size — <span id="adj-ps-val">100%</span></label>
+            <input type="range" id="adj-ps" min="40" max="180" value="100" style="width:100%;margin-bottom:10px">
+            <label class="blog-form-label">Left / Right — <span id="adj-px-val">0</span></label>
+            <input type="range" id="adj-px" min="-500" max="500" value="0" style="width:100%;margin-bottom:10px">
+            <label class="blog-form-label">Up / Down — <span id="adj-py-val">0</span></label>
+            <input type="range" id="adj-py" min="-400" max="400" value="0" style="width:100%">
+          </div>
+
+          <div>
+            <p style="font-weight:600;font-size:13px;margin-bottom:12px;color:var(--text-primary)">Logo</p>
+            <label class="blog-form-label">Size — <span id="adj-ls-val">100%</span></label>
+            <input type="range" id="adj-ls" min="20" max="200" value="100" style="width:100%;margin-bottom:10px">
+            <label class="blog-form-label">Left / Right — <span id="adj-lx-val">0</span></label>
+            <input type="range" id="adj-lx" min="-500" max="500" value="0" style="width:100%;margin-bottom:10px">
+            <label class="blog-form-label">Up / Down — <span id="adj-ly-val">0</span></label>
+            <input type="range" id="adj-ly" min="-400" max="400" value="0" style="width:100%">
+          </div>
+
+        </div>
+
+        <div>
+          <p style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text-primary)">Background colour</p>
+          <div style="display:flex;gap:10px">
+            <button class="talk-color-btn adj-bg-btn" data-color="black"
+              style="border:2px solid ${currentBg === 'black' ? 'var(--pink)' : 'transparent'};background:#000000;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px">
+              Black
+            </button>
+            <button class="talk-color-btn adj-bg-btn" data-color="pink"
+              style="border:2px solid ${currentBg === 'pink' ? 'var(--pink)' : 'transparent'};background:#FF0077;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px">
+              Pink
+            </button>
+          </div>
+        </div>
+
+        <div class="blog-form-actions" style="margin-top:4px">
+          <button class="blog-form-cancel" id="adj-back">${lucideSVG('arrow-left', 14, 'currentColor')} Regenerate</button>
+          <button class="blog-form-submit" id="adj-use">${lucideSVG('check', 14, 'currentColor')} Use this</button>
+        </div>
+      </div>
+    </div>
+  `
+  _mount.appendChild(overlay)
+
+  const canvas = overlay.querySelector('#adj-canvas')
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+
+  const personImg = new Image()
+  const logoImg   = new Image()
+  let loaded = 0
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H)
+    ctx.fillStyle = BG_COLORS[currentBg] || '#000000'
+    ctx.fillRect(0, 0, W, H)
+
+    if (loaded < 2) return
+
+    // Person — scale from default size, keep bottom-anchored
+    const dp = defaults.person
+    const newPw = Math.round(dp.w * personScale)
+    const newPh = Math.round(dp.h * personScale)
+    const newPx = dp.x + personOffX
+    const newPy = (dp.y + dp.h) - newPh + personOffY  // bottom-anchor then shift
+    ctx.drawImage(personImg, newPx, newPy, newPw, newPh)
+
+    // Logo — scale from default size, keep centred on its default centre point
+    const dl = defaults.logo
+    const newLw = Math.round(dl.w * logoScale)
+    const newLh = Math.round(dl.h * logoScale)
+    const centreLx = dl.x + dl.w / 2
+    const centreLy = dl.y + dl.h / 2
+    const newLx = Math.round(centreLx - newLw / 2 + logoOffX)
+    const newLy = Math.round(centreLy - newLh / 2 + logoOffY)
+    ctx.drawImage(logoImg, newLx, newLy, newLw, newLh)
+  }
+
+  personImg.onload = () => { loaded++; draw() }
+  logoImg.onload   = () => { loaded++; draw() }
+  personImg.src    = personDataUrl
+  logoImg.src      = logoDataUrl
+
+  // Wire up sliders
+  const sliderDefs = [
+    ['#adj-ps', '#adj-ps-val', v => { personScale = v / 100 }, v => `${v}%`],
+    ['#adj-px', '#adj-px-val', v => { personOffX  = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+    ['#adj-py', '#adj-py-val', v => { personOffY  = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+    ['#adj-ls', '#adj-ls-val', v => { logoScale   = v / 100 }, v => `${v}%`],
+    ['#adj-lx', '#adj-lx-val', v => { logoOffX    = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+    ['#adj-ly', '#adj-ly-val', v => { logoOffY    = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+  ]
+  sliderDefs.forEach(([inputSel, labelSel, setter, fmt]) => {
+    const input = overlay.querySelector(inputSel)
+    const label = overlay.querySelector(labelSel)
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value, 10)
+      label.textContent = fmt(v)
+      setter(v)
+      draw()
+    })
+  })
+
+  // BG colour buttons
+  overlay.querySelectorAll('.adj-bg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentBg = btn.dataset.color
+      overlay.querySelectorAll('.adj-bg-btn').forEach(b => {
+        b.style.borderColor = b === btn ? 'var(--pink)' : 'transparent'
+      })
+      draw()
+    })
+  })
+
+  // Close / back
+  overlay.querySelector('#adj-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+  overlay.querySelector('#adj-back').addEventListener('click', () => {
+    overlay.remove()
+    showTalkDataForm(blogMeta, csvRows, currentIndex)
+  })
+
+  // Use this → export canvas as PNG and proceed to result screen
+  overlay.querySelector('#adj-use').addEventListener('click', () => {
+    const finalDataUrl = canvas.toDataURL('image/png')
+    overlay.remove()
+    showThumbnailResult(blogMeta, finalDataUrl, csvRows, currentIndex, null, 0, null)
+  })
+}
+
 // ── Image resize helper ───────────────────────────────────────────────────────
 // Scales an image File down so neither dimension exceeds maxPx, returns a Blob
 function resizeImageFile(file, maxPx = 1000) {
@@ -1225,7 +1390,7 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
       if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
 
       overlay.remove()
-      showThumbnailResult(blogMeta, data.image, csvRows, currentIndex, null, 0, null)
+      showTalkDataAdjust(blogMeta, data.personImage, data.logoImage, data.defaults, csvRows, currentIndex)
     } catch (err) {
       errEl.textContent = err.message || 'Generation failed — try again'
       errEl.style.display = 'block'
