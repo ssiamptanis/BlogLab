@@ -1343,100 +1343,17 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
             for f in selected if images.get(f['id'])]
 
 
-def _detect_person_crop_box(pil_img, target_ratio):
-    """Locate the face region in a portrait photo using PIL edge density analysis.
-
-    Scans the image row-by-row for edge magnitude (pixel gradient).
-    Faces have high edge density (eyes, nose, mouth, hair edges).
-    The row with peak density is the face centre — we crop around that,
-    showing head + shoulders.
-
-    No external APIs or ML models needed — pure PIL/Python.
-
-    Returns (x1, y1, x2, y2) in pixels, or None on failure.
-    """
-    try:
-        src_w, src_h = pil_img.size
-
-        # Work on a small greyscale copy — 200px wide is plenty for row analysis
-        analysis_w = 200
-        analysis_h = int(src_h * analysis_w / src_w)
-        small = pil_img.resize((analysis_w, analysis_h), Image.LANCZOS).convert('L')
-        pixels = list(small.getdata())
-
-        # Compute per-row edge score: sum of vertical gradients across the row
-        row_scores = []
-        for y in range(1, analysis_h):
-            score = 0
-            for x in range(analysis_w):
-                above = pixels[(y - 1) * analysis_w + x]
-                here  = pixels[y       * analysis_w + x]
-                score += abs(here - above)
-            row_scores.append(score)
-
-        # Only search the top 65% — faces never appear in the bottom third
-        # of a portrait person photo
-        search_limit = int(len(row_scores) * 0.65)
-        search_rows  = row_scores[:search_limit]
-
-        if not search_rows:
-            return None
-
-        # Smooth with a sliding window to find the densest band, not just one row
-        window   = max(1, len(search_rows) // 12)
-        smoothed = []
-        for i in range(len(search_rows)):
-            s = max(0, i - window)
-            e = min(len(search_rows), i + window + 1)
-            smoothed.append(sum(search_rows[s:e]) / (e - s))
-
-        # Peak smoothed row = face centre in the analysis image
-        peak_row = max(range(len(smoothed)), key=lambda i: smoothed[i])
-
-        # Convert to original image pixel coordinate
-        scale          = src_h / analysis_h
-        face_center_y  = int((peak_row + 1) * scale)
-
-        # Build the crop window:
-        #   - The face centre sits ~30% from the top of the crop (leaving room
-        #     for hair above and shoulders below)
-        #   - Crop width enforces the target aspect ratio, centred horizontally
-        # We size the crop so that the face centre divides it 30% / 70%
-        # The 70% below gives room for chin → neck → shoulders
-        # We pick the crop height so it's the entire image width / target_ratio
-        # (i.e. take the full width and derive the height) — unless that pushes
-        # us past the image boundary, in which case we shrink to fit.
-        crop_w = src_w
-        crop_h = int(crop_w / target_ratio)
-
-        # Position: face_center_y at 30% from top of crop
-        y1 = max(0, face_center_y - int(crop_h * 0.30))
-        y2 = y1 + crop_h
-
-        # Clamp to image bounds, sliding the window up if we overshot the bottom
-        if y2 > src_h:
-            y2 = src_h
-            y1 = max(0, y2 - crop_h)
-
-        x1 = 0
-        x2 = src_w
-
-        print(f'[edge-crop] face centre y={face_center_y} → '
-              f'crop=({x1},{y1},{x2},{y2}) on {src_w}×{src_h}', flush=True)
-        return x1, y1, x2, y2
-
-    except Exception as e:
-        print(f'[edge-crop] error: {e}', flush=True)
-        return None
-
-
 def _compose_image(image_url, width=1200, height=700):
-    """Download image, smart-crop to target dimensions, return base64 PNG.
+    """Download image, crop to target dimensions, return base64 PNG.
 
-    Portrait sources (person photos for Audiences) go through Claude vision
-    to locate the bust/head+shoulders region and crop precisely to that.
-    If vision detection fails the image is skipped (caller should try next option).
-    Landscape / square sources use a simple centre crop.
+    Portrait sources (person photos): take the full width from the top.
+    The crop height is derived from the target aspect ratio, so the result
+    is always the correct shape. Starting from y=0 ensures the head is
+    always in frame — portrait photos on Pexels are composed with the
+    subject at the top.
+
+    Landscape sources wider than target: centre-crop horizontally.
+    Square / landscape sources narrower than target: centre-crop vertically.
     """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
@@ -1445,58 +1362,22 @@ def _compose_image(image_url, width=1200, height=700):
     target_ratio = width / height
     src_w, src_h = img.size
     src_ratio    = src_w / src_h
-    is_portrait  = src_h > src_w   # taller than wide → likely a person photo
+    is_portrait  = src_h > src_w
 
-    if src_ratio > target_ratio:
-        # ── Landscape wider than target: centre-crop width ────────────────────
+    if is_portrait:
+        # Full width, height derived from target ratio, anchored to top
+        crop_h = int(src_w / target_ratio)
+        crop_h = min(crop_h, src_h)
+        img = img.crop((0, 0, src_w, crop_h))
+
+    elif src_ratio > target_ratio:
+        # Landscape wider than target: centre-crop width
         new_w = int(src_h * target_ratio)
         left  = (src_w - new_w) // 2
         img   = img.crop((left, 0, left + new_w, src_h))
 
-    elif is_portrait:
-        # ── Portrait source: use Claude vision to find the bust region ────────
-        box = _detect_person_crop_box(img, target_ratio)
-
-        if box:
-            bx1, by1, bx2, by2 = box
-
-            # Expand the vision box slightly to avoid clipping hair/shoulders
-            pad_x = int((bx2 - bx1) * 0.05)
-            pad_y = int((by2 - by1) * 0.05)
-            bx1 = max(0, bx1 - pad_x)
-            by1 = max(0, by1 - pad_y)
-            bx2 = min(src_w, bx2 + pad_x)
-            by2 = min(src_h, by2 + pad_y)
-
-            # Enforce target aspect ratio centred on the vision box
-            cx   = (bx1 + bx2) // 2
-            cy   = (by1 + by2) // 2
-            h    = by2 - by1
-            w    = int(h * target_ratio)
-
-            # If computed width exceeds image width, lock to image width and
-            # recalculate height so we don't distort
-            if w > src_w:
-                w = src_w
-                h = int(w / target_ratio)
-
-            x1 = max(0, cx - w // 2)
-            x2 = min(src_w, x1 + w)
-            x1 = max(0, x2 - w)
-
-            y1 = max(0, cy - h // 2)
-            y2 = min(src_h, y1 + h)
-            y1 = max(0, y2 - h)
-
-            img = img.crop((x1, y1, x2, y2))
-            print(f'[vision-crop] final crop=({x1},{y1},{x2},{y2})', flush=True)
-
-        else:
-            # Edge analysis failed — skip this image
-            raise ValueError('Could not locate face region in portrait image — skip this candidate')
-
     else:
-        # ── Landscape / square source: centre-crop height ─────────────────────
+        # Square / landscape narrower than target: centre-crop height
         new_h = int(src_w / target_ratio)
         top   = (src_h - new_h) // 2
         img   = img.crop((0, top, src_w, top + new_h))
