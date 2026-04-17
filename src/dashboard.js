@@ -155,10 +155,10 @@ function cardHTML(t) {
       <div class="tmpl-card-thumb">
         ${thumbHTML}
         <span class="tmpl-status-badge ${statusClass} tmpl-status-thumb">${statusLabel}</span>
-        ${typeLabel ? `<div class="tmpl-card-type-badge">${typeLabel}</div>` : ''}
         ${!mine ? `<div class="tmpl-card-viewonly-badge">${lucideSVG('eye', 10, 'currentColor')} View only</div>` : ''}
       </div>
       <div class="tmpl-card-body">
+        ${typeLabel ? `<div class="tmpl-card-type-label">${typeLabel}</div>` : ''}
         <div class="tmpl-card-name">${escHtml(t.name)}</div>
         <div class="tmpl-card-folder ${folder ? '' : 'tmpl-card-folder--unfiled'}">${lucideSVG('folder', 11, 'currentColor')} ${folder ? escHtml(folder) : 'Not filed yet'}</div>
         ${authorHTML}

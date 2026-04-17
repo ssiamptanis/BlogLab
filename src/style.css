@@ -4119,20 +4119,13 @@ body, html { overflow-x: hidden; }
   z-index: 3;
 }
 
-.tmpl-card-type-badge {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: #101720;
-  color: #DFE7F5;
+.tmpl-card-type-label {
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 4px 10px;
-  text-align: center;
-  pointer-events: none;
+  color: var(--grey-5);
+  margin-bottom: 4px;
 }
 
 .tmpl-card-thumb-img {
