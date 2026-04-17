@@ -1096,6 +1096,33 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   })
 }
 
+// ── Image resize helper ───────────────────────────────────────────────────────
+// Scales an image File down so neither dimension exceeds maxPx, returns a Blob
+function resizeImageFile(file, maxPx = 1000) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      let { width: w, height: h } = img
+      if (w <= maxPx && h <= maxPx) {
+        // Already small enough — return original as blob
+        resolve(file)
+        return
+      }
+      const scale = maxPx / Math.max(w, h)
+      w = Math.round(w * scale)
+      h = Math.round(h * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Resize failed')), 'image/jpeg', 0.92)
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read image')) }
+    img.src = url
+  })
+}
+
 // ── Talk data to me ───────────────────────────────────────────────────────────
 function showTalkDataForm(blogMeta, csvRows, currentIndex) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
@@ -1181,9 +1208,16 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
     btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Removing backgrounds…`
 
     try {
+      // Resize both files to max 1000px wide/tall before uploading — keeps
+      // payloads small and avoids remove.bg resolution limits / Render timeouts
+      const [personBlob, logoBlob] = await Promise.all([
+        resizeImageFile(personFile, 1000),
+        resizeImageFile(logoFile,   1000),
+      ])
+
       const formData = new FormData()
-      formData.append('person',  personFile)
-      formData.append('logo',    logoFile)
+      formData.append('person',  personBlob, personFile.name)
+      formData.append('logo',    logoBlob,   logoFile.name)
       formData.append('bgColor', selectedColor)
 
       const res  = await apiUpload('/api/thumbnail/talkdata', formData)
