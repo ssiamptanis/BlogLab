@@ -946,26 +946,11 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
     }
   })
 
-  // Select image → compose
+  // Select image → adjustment screen (user crops/positions before composing)
   overlay.querySelectorAll('.thumb-picker-card').forEach(card => {
-    card.addEventListener('click', async () => {
-      overlay.querySelectorAll('.thumb-picker-card').forEach(c => c.classList.remove('selected'))
-      card.classList.add('selected')
-      card.innerHTML = `<span class="page-spinner" style="width:24px;height:24px;border-width:3px"></span>`
-
-      try {
-        const res = await apiFetch('/api/thumbnail/compose', {
-          method: 'POST',
-          body: JSON.stringify({ imageUrl: card.dataset.url })
-        })
-        overlay.remove()
-        showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, _attempt, card.dataset.url)
-      } catch (err) {
-        const errEl = overlay.querySelector('#thumb-picker-error')
-        errEl.textContent = 'Failed to compose image — try another'
-        errEl.style.display = 'block'
-        overlay.querySelectorAll('.thumb-picker-card').forEach(c => c.classList.remove('selected'))
-      }
+    card.addEventListener('click', () => {
+      overlay.remove()
+      showImageAdjust(blogMeta, card.dataset.url, csvRows, currentIndex, result, _attempt)
     })
   })
 }
@@ -1093,6 +1078,189 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   overlay.querySelector('#thumb-result-next')?.addEventListener('click', () => {
     overlay.remove()
     showBlogThumbnailForm(csvRows, currentIndex + 1)
+  })
+}
+
+// ── Shared slider fill helper (WebKit track fill via CSS --pct variable) ─────
+function syncFill(input) {
+  const min = parseFloat(input.min) || 0
+  const max = parseFloat(input.max) || 100
+  const val = parseFloat(input.value)
+  const pct = ((val - min) / (max - min)) * 100
+  input.style.setProperty('--pct', `${pct}%`)
+}
+
+// ── Image crop/position adjustment (all Pexels/Figma categories) ─────────────
+function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, attempt) {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  const W = 1200, H = 700
+
+  let userScale = 1.0
+  let offsetX   = 0
+  let offsetY   = 0
+
+  // Replicate server _compose_image default positioning so preview matches output
+  function calcDraw(imgW, imgH, scale, ox, oy) {
+    const isPortrait = imgH > imgW
+    const base = Math.max(W / imgW, H / imgH) * scale
+    const dw   = imgW * base
+    const dh   = imgH * base
+    const bx   = (W - dw) / 2
+    const by   = isPortrait ? 0 : (H - dh) / 2
+    return { x: bx + ox, y: by + oy, w: dw, h: dh }
+  }
+
+  const overlay = document.createElement('div')
+  overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <style>
+      .iadj-slider {
+        width: 100%;
+        margin-bottom: 10px;
+        appearance: none;
+        -webkit-appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+        background: transparent;
+      }
+      .iadj-slider::-webkit-slider-runnable-track {
+        height: 4px;
+        border-radius: 2px;
+        background: linear-gradient(to right,
+          #FF0077 0%, #FF0077 var(--pct, 50%),
+          rgba(255,255,255,0.15) var(--pct, 50%), rgba(255,255,255,0.15) 100%);
+      }
+      .iadj-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        background: #FF0077;
+        cursor: pointer;
+        margin-top: -5px;
+      }
+      .iadj-slider::-moz-range-track {
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px; height: 4px;
+      }
+      .iadj-slider::-moz-range-progress {
+        background: #FF0077;
+        border-radius: 2px; height: 4px;
+      }
+      .iadj-slider::-moz-range-thumb {
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        background: #FF0077;
+        cursor: pointer; border: none;
+      }
+    </style>
+    <div class="tmpl-picker-modal blog-form-modal" style="max-width:820px;width:92vw">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Adjust image</h2>
+          <p class="tmpl-picker-subtitle">${escHtml(blogMeta.title)}</p>
+        </div>
+        <button class="tmpl-picker-close" id="iadj-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="blog-form" style="gap:16px">
+        <canvas id="iadj-canvas" style="width:100%;border-radius:6px;display:block;background:#111"></canvas>
+        <div id="iadj-loading" style="text-align:center;font-size:13px;color:var(--text-secondary);margin-top:-8px">Loading image…</div>
+
+        <div style="max-width:420px;margin:0 auto;width:100%">
+          <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:#fff">Image adjustments</p>
+          <label class="blog-form-label">Scale — <span id="iadj-scale-val">100%</span></label>
+          <input type="range" class="iadj-slider" id="iadj-scale" min="80" max="300" value="100">
+          <label class="blog-form-label">Left / Right — <span id="iadj-x-val">0</span></label>
+          <input type="range" class="iadj-slider" id="iadj-x" min="-600" max="600" value="0">
+          <label class="blog-form-label">Up / Down — <span id="iadj-y-val">0</span></label>
+          <input type="range" class="iadj-slider" id="iadj-y" min="-600" max="600" value="0">
+        </div>
+
+        <div id="iadj-error" class="blog-form-error" style="display:none"></div>
+
+        <div class="blog-form-actions" style="margin-top:4px">
+          <button class="blog-form-cancel" id="iadj-back" style="display:flex;align-items:center;gap:6px">
+            <span style="display:flex;align-items:center;position:relative;top:1px">${lucideSVG('arrow-left', 14, 'currentColor')}</span>
+            Try another
+          </button>
+          <button class="blog-form-submit" id="iadj-use">${lucideSVG('check', 14, 'currentColor')} Use this</button>
+        </div>
+      </div>
+    </div>
+  `
+  _mount.appendChild(overlay)
+
+  const canvas  = overlay.querySelector('#iadj-canvas')
+  const loadMsg = overlay.querySelector('#iadj-loading')
+  canvas.width  = W
+  canvas.height = H
+  const ctx = canvas.getContext('2d')
+
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => {
+    loadMsg.style.display = 'none'
+    draw()
+  }
+  img.onerror = () => { loadMsg.textContent = 'Could not load preview — adjust blind or try another image.' }
+  img.src = imageUrl
+
+  function draw() {
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, W, H)
+    if (!img.naturalWidth) return
+    const p = calcDraw(img.naturalWidth, img.naturalHeight, userScale, offsetX, offsetY)
+    ctx.drawImage(img, p.x, p.y, p.w, p.h)
+  }
+
+  // Sliders
+  const sliderDefs = [
+    ['#iadj-scale', '#iadj-scale-val', v => { userScale = v / 100 }, v => `${v}%`],
+    ['#iadj-x',     '#iadj-x-val',     v => { offsetX   = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+    ['#iadj-y',     '#iadj-y-val',     v => { offsetY   = v       }, v => v >= 0 ? `+${v}` : `${v}`],
+  ]
+  sliderDefs.forEach(([sel, lblSel, setter, fmt]) => {
+    const input = overlay.querySelector(sel)
+    const label = overlay.querySelector(lblSel)
+    syncFill(input)
+    input.addEventListener('input', () => {
+      const v = parseInt(input.value, 10)
+      label.textContent = fmt(v)
+      setter(v)
+      syncFill(input)
+      draw()
+    })
+  })
+
+  // Close / back
+  overlay.querySelector('#iadj-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+  overlay.querySelector('#iadj-back').addEventListener('click', () => {
+    overlay.remove()
+    showThumbPicker(blogMeta, result, csvRows, currentIndex, attempt)
+  })
+
+  // Use this → server composes with user's params
+  overlay.querySelector('#iadj-use').addEventListener('click', async () => {
+    const btn   = overlay.querySelector('#iadj-use')
+    const errEl = overlay.querySelector('#iadj-error')
+    btn.disabled = true
+    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
+    errEl.style.display = 'none'
+    try {
+      const res = await apiFetch('/api/thumbnail/compose', {
+        method: 'POST',
+        body: JSON.stringify({ imageUrl, scale: userScale, offsetX, offsetY }),
+      })
+      overlay.remove()
+      showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, attempt, imageUrl)
+    } catch (err) {
+      errEl.textContent = 'Composition failed — try again'
+      errEl.style.display = 'block'
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('check', 14, 'currentColor')} Use this`
+    }
   })
 }
 
@@ -1269,15 +1437,6 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
   logoImg.onload   = () => { loaded++; draw() }
   personImg.src    = personDataUrl
   logoImg.src      = logoDataUrl
-
-  // Update the CSS --pct variable so the WebKit track fill follows the thumb
-  function syncFill(input) {
-    const min = parseFloat(input.min) || 0
-    const max = parseFloat(input.max) || 100
-    const val = parseFloat(input.value)
-    const pct = ((val - min) / (max - min)) * 100
-    input.style.setProperty('--pct', `${pct}%`)
-  }
 
   // Wire up sliders
   const sliderDefs = [

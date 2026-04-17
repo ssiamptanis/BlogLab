@@ -1362,46 +1362,41 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
             for f in selected if images.get(f['id'])]
 
 
-def _compose_image(image_url, width=1200, height=700):
-    """Download image, crop to exactly width×height, return base64 PNG.
+def _compose_image(image_url, width=1200, height=700, user_scale=1.0, offset_x=0, offset_y=0):
+    """Download image, scale to cover width×height, apply user pan/zoom, return base64 PNG.
 
-    Portrait sources (Audiences person photos, 800×1200 from Pexels):
-      Take the full image width and derive crop height from the target ratio.
-      Anchor at y=0 so the head is always at the top of the frame.
-      800×1200 → crop 800×467 from top → resize to 1200×700.
-
-    Landscape wider than target: centre-crop horizontally.
-    Square / landscape narrower than target: centre-crop vertically.
+    Default (user_scale=1.0, offset_x/y=0) reproduces the old auto-crop behaviour:
+      - Portrait: scale to fill width, anchor top (head at top of frame)
+      - Landscape wider than target: scale to fill height, centre horizontally
+      - Square / landscape narrower: scale to fill width, centre vertically
+    User controls override these defaults via scale multiplier and pixel offsets.
     """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
     img = Image.open(io.BytesIO(res.content)).convert('RGB')
 
-    target_ratio = width / height   # 1200/700 ≈ 1.714
     src_w, src_h = img.size
-    src_ratio    = src_w / src_h
     is_portrait  = src_h > src_w
 
-    if is_portrait:
-        # Full width from top — head is always at y=0 for Pexels portrait images
-        crop_h = int(src_w / target_ratio)
-        img    = img.crop((0, 0, src_w, min(crop_h, src_h)))
+    # Scale so image covers the canvas, then apply user multiplier
+    base_scale = max(width / src_w, height / src_h) * user_scale
+    draw_w     = max(1, int(src_w * base_scale))
+    draw_h     = max(1, int(src_h * base_scale))
 
-    elif src_ratio > target_ratio:
-        # Landscape wider than target: centre-crop width
-        new_w = int(src_h * target_ratio)
-        left  = (src_w - new_w) // 2
-        img   = img.crop((left, 0, left + new_w, src_h))
+    img_resized = img.resize((draw_w, draw_h), Image.LANCZOS)
 
-    else:
-        # Square / landscape narrower than target: centre-crop height
-        new_h = int(src_w / target_ratio)
-        top   = (src_h - new_h) // 2
-        img   = img.crop((0, top, src_w, top + new_h))
+    # Default anchor: portrait → top-centre; landscape → centre
+    base_x = (width  - draw_w) // 2
+    base_y = 0 if is_portrait else (height - draw_h) // 2
 
-    img = img.resize((width, height), Image.LANCZOS)
+    draw_x = base_x + offset_x
+    draw_y = base_y + offset_y
+
+    canvas = Image.new('RGB', (width, height), (0, 0, 0))
+    canvas.paste(img_resized, (draw_x, draw_y))
+
     buf = io.BytesIO()
-    img.save(buf, format='PNG', optimize=True)
+    canvas.save(buf, format='PNG', optimize=True)
     buf.seek(0)
     return base64.b64encode(buf.read()).decode('utf-8')
 
@@ -1460,8 +1455,11 @@ def compose_thumbnail():
     image_url = data.get('imageUrl', '').strip()
     if not image_url:
         return jsonify({'error': 'imageUrl is required'}), 400
+    user_scale = float(data.get('scale',   1.0))
+    offset_x   = int(data.get('offsetX',   0))
+    offset_y   = int(data.get('offsetY',   0))
     try:
-        b64 = _compose_image(image_url)
+        b64 = _compose_image(image_url, user_scale=user_scale, offset_x=offset_x, offset_y=offset_y)
         return jsonify({'ok': True, 'image': f'data:image/png;base64,{b64}'})
     except Exception as e:
         return jsonify({'error': f'Compose failed: {e}'}), 500
