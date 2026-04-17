@@ -1115,6 +1115,46 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
   const overlay = document.createElement('div')
   overlay.className = 'blog-form-overlay tmpl-picker-overlay'
   overlay.innerHTML = `
+    <style>
+      .adj-slider {
+        width: 100%;
+        margin-bottom: 10px;
+        accent-color: #FF0077;
+        appearance: none;
+        -webkit-appearance: none;
+        height: 4px;
+        border-radius: 2px;
+        outline: none;
+        cursor: pointer;
+        background: rgba(255,255,255,0.15);
+      }
+      .adj-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #FF0077;
+        cursor: pointer;
+      }
+      .adj-slider::-moz-range-thumb {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #FF0077;
+        cursor: pointer;
+        border: none;
+      }
+      .adj-slider::-webkit-slider-runnable-track {
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        height: 4px;
+      }
+      .adj-slider::-moz-range-track {
+        background: rgba(255,255,255,0.15);
+        border-radius: 2px;
+        height: 4px;
+      }
+    </style>
     <div class="tmpl-picker-modal blog-form-modal" style="max-width:820px;width:92vw">
       <div class="tmpl-picker-header">
         <div>
@@ -1130,43 +1170,46 @@ function showTalkDataAdjust(blogMeta, personDataUrl, logoDataUrl, defaults, csvR
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:4px">
 
           <div>
-            <p style="font-weight:600;font-size:13px;margin-bottom:12px;color:var(--text-primary)">Person</p>
+            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:var(--text-secondary)">Image adjustments</p>
             <label class="blog-form-label">Size — <span id="adj-ps-val">100%</span></label>
-            <input type="range" id="adj-ps" min="40" max="180" value="100" style="width:100%;margin-bottom:10px">
+            <input type="range" class="adj-slider" id="adj-ps" min="40" max="180" value="100">
             <label class="blog-form-label">Left / Right — <span id="adj-px-val">0</span></label>
-            <input type="range" id="adj-px" min="-500" max="500" value="0" style="width:100%;margin-bottom:10px">
+            <input type="range" class="adj-slider" id="adj-px" min="-500" max="500" value="0">
             <label class="blog-form-label">Up / Down — <span id="adj-py-val">0</span></label>
-            <input type="range" id="adj-py" min="-400" max="400" value="0" style="width:100%">
+            <input type="range" class="adj-slider" id="adj-py" min="-400" max="400" value="0">
           </div>
 
           <div>
-            <p style="font-weight:600;font-size:13px;margin-bottom:12px;color:var(--text-primary)">Logo</p>
+            <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:var(--text-secondary)">Logo adjustments</p>
             <label class="blog-form-label">Size — <span id="adj-ls-val">100%</span></label>
-            <input type="range" id="adj-ls" min="20" max="200" value="100" style="width:100%;margin-bottom:10px">
+            <input type="range" class="adj-slider" id="adj-ls" min="20" max="200" value="100">
             <label class="blog-form-label">Left / Right — <span id="adj-lx-val">0</span></label>
-            <input type="range" id="adj-lx" min="-500" max="500" value="0" style="width:100%;margin-bottom:10px">
+            <input type="range" class="adj-slider" id="adj-lx" min="-500" max="500" value="0">
             <label class="blog-form-label">Up / Down — <span id="adj-ly-val">0</span></label>
-            <input type="range" id="adj-ly" min="-400" max="400" value="0" style="width:100%">
+            <input type="range" class="adj-slider" id="adj-ly" min="-400" max="400" value="0">
           </div>
 
         </div>
 
-        <div>
-          <p style="font-weight:600;font-size:13px;margin-bottom:10px;color:var(--text-primary)">Background colour</p>
+        <div style="display:flex;align-items:center;gap:14px">
+          <span style="font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap">Background colour</span>
           <div style="display:flex;gap:10px">
-            <button class="talk-color-btn adj-bg-btn" data-color="black"
-              style="border:2px solid ${currentBg === 'black' ? 'var(--pink)' : 'transparent'};background:#000000;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px">
+            <button class="adj-bg-btn" data-color="black"
+              style="border:2px solid ${currentBg === 'black' ? '#FF0077' : 'transparent'};background:#000000;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
               Black
             </button>
-            <button class="talk-color-btn adj-bg-btn" data-color="pink"
-              style="border:2px solid ${currentBg === 'pink' ? 'var(--pink)' : 'transparent'};background:#FF0077;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px">
+            <button class="adj-bg-btn" data-color="pink"
+              style="border:2px solid ${currentBg === 'pink' ? '#FF0077' : 'transparent'};background:#FF0077;color:#fff;padding:6px 18px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
               Pink
             </button>
           </div>
         </div>
 
         <div class="blog-form-actions" style="margin-top:4px">
-          <button class="blog-form-cancel" id="adj-back">${lucideSVG('arrow-left', 14, 'currentColor')} Regenerate</button>
+          <button class="blog-form-cancel" id="adj-back" style="display:flex;align-items:center;gap:6px">
+            <span style="display:flex;align-items:center;position:relative;top:1px">${lucideSVG('arrow-left', 14, 'currentColor')}</span>
+            Regenerate
+          </button>
           <button class="blog-form-submit" id="adj-use">${lucideSVG('check', 14, 'currentColor')} Use this</button>
         </div>
       </div>
@@ -1319,20 +1362,6 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
           <input class="blog-form-input" id="talk-logo" type="file" accept="image/*" style="padding:8px" />
         </div>
 
-        <div class="blog-form-field">
-          <label class="blog-form-label">Background colour</label>
-          <div style="display:flex;gap:12px;margin-top:8px">
-            <button type="button" class="talk-color-btn active" data-color="black"
-              style="background:#101720;color:#fff;border:2px solid var(--pink);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
-              Black
-            </button>
-            <button type="button" class="talk-color-btn" data-color="pink"
-              style="background:#FF0077;color:#fff;border:2px solid transparent;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
-              Pink
-            </button>
-          </div>
-        </div>
-
         <div class="blog-form-actions" style="margin-top:8px">
           <button class="blog-form-cancel" id="talk-cancel">Cancel</button>
           <button class="blog-form-submit" id="talk-generate">
@@ -1346,17 +1375,6 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
   overlay.querySelector('#talk-close').addEventListener('click',  () => overlay.remove())
   overlay.querySelector('#talk-cancel').addEventListener('click', () => overlay.remove())
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
-
-  // Colour toggle
-  let selectedColor = 'black'
-  overlay.querySelectorAll('.talk-color-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      selectedColor = btn.dataset.color
-      overlay.querySelectorAll('.talk-color-btn').forEach(b => {
-        b.style.borderColor = b === btn ? 'var(--pink)' : 'transparent'
-      })
-    })
-  })
 
   // Generate
   overlay.querySelector('#talk-generate').addEventListener('click', async () => {
@@ -1383,7 +1401,7 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
       const formData = new FormData()
       formData.append('person',  personBlob, personFile.name)
       formData.append('logo',    logoBlob,   logoFile.name)
-      formData.append('bgColor', selectedColor)
+      formData.append('bgColor', 'black')
 
       const res  = await apiUpload('/api/thumbnail/talkdata', formData)
       const data = await res.json()
