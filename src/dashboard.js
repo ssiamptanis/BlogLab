@@ -1034,6 +1034,21 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         const { data: { session } } = await supabase.auth.getSession()
         userId = session?.user?.id || null
       }
+
+      // Generate a small JPEG preview (360×210) from the composed imageDataUrl
+      // so the dashboard card always shows exactly what the user agreed to download
+      const previewJpeg = await new Promise(resolve => {
+        const img = new Image()
+        img.onload = () => {
+          const c = document.createElement('canvas')
+          c.width = 360; c.height = 210
+          c.getContext('2d').drawImage(img, 0, 0, 360, 210)
+          resolve(c.toDataURL('image/jpeg', 0.85))
+        }
+        img.onerror = () => resolve(null)
+        img.src = imageDataUrl
+      })
+
       const { data: record, error } = await supabase
         .from('templates')
         .insert({
@@ -1042,7 +1057,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           status:        'saved',
           folder_id:     null,
           template_type: 'blog-thumbnail',
-          doc:           { imageUrl: sourceImageUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
+          doc:           { imageUrl: sourceImageUrl, previewJpeg, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
           block_count:   0,
           block_types:   [],
         })
@@ -1053,7 +1068,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
 
       _templates.unshift({
         ...record,
-        doc_image_url:     sourceImageUrl || '',
+        doc_image_url:     previewJpeg || sourceImageUrl || '',
         doc_author:        user.name      || '',
         doc_author_avatar: user.avatarUrl || '',
       })

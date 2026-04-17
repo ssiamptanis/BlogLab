@@ -309,7 +309,7 @@ def list_templates():
         doc = t.pop("doc", None) or {}
         t["doc_author"]        = doc.get("docAuthor", "")
         t["doc_author_avatar"] = doc.get("docAuthorAvatar", "")
-        t["doc_image_url"]     = doc.get("imageUrl", "")
+        t["doc_image_url"]     = doc.get("previewJpeg") or doc.get("imageUrl", "")
         templates.append(t)
     data = {"templates": templates, "folders": folders_res.data}
     _templates_cache_set(g.user_id, data)
