@@ -1509,12 +1509,12 @@ def save_thumbnail():
 _rembg_session = None
 
 def _get_rembg_session():
-    """Lazy-load and cache the rembg u2net_human_seg model."""
+    """Lazy-load and cache the rembg u2netp model (fast, 4.7 MB — fits Render free tier CPU)."""
     global _rembg_session
     if _rembg_session is None:
         from rembg import new_session as _new_session
-        _rembg_session = _new_session('u2net_human_seg')
-        print('[rembg] model loaded: u2net_human_seg', flush=True)
+        _rembg_session = _new_session('u2netp')
+        print('[rembg] model loaded: u2netp', flush=True)
     return _rembg_session
 
 
