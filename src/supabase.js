@@ -47,3 +47,13 @@ export async function apiFetch(path, options = {}) {
   }
   return fetch(`${API_BASE}${path}`, { ...options, headers })
 }
+
+/** Authenticated multipart upload — lets the browser set the Content-Type boundary automatically */
+export async function apiUpload(path, formData) {
+  const token = await getToken()
+  return fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+  })
+}

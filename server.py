@@ -1504,6 +1504,102 @@ def save_thumbnail():
         return jsonify({'error': f'Save failed: {e}'}), 500
 
 
+# ── Talk data to me — background removal + composition ───────────────────────
+
+_rembg_session = None
+
+def _get_rembg_session():
+    """Lazy-load and cache the rembg u2net_human_seg model."""
+    global _rembg_session
+    if _rembg_session is None:
+        from rembg import new_session as _new_session
+        _rembg_session = _new_session('u2net_human_seg')
+        print('[rembg] model loaded: u2net_human_seg', flush=True)
+    return _rembg_session
+
+
+def _remove_bg(img_bytes):
+    """Remove background from raw image bytes. Returns RGBA PIL Image."""
+    from rembg import remove as _rembg_remove
+    session  = _get_rembg_session()
+    out_bytes = _rembg_remove(img_bytes, session=session)
+    return Image.open(io.BytesIO(out_bytes)).convert('RGBA')
+
+
+@app.route('/api/thumbnail/talkdata', methods=['POST'])
+@require_auth
+def generate_talkdata_thumbnail():
+    person_file = request.files.get('person')
+    logo_file   = request.files.get('logo')
+    bg_color    = (request.form.get('bgColor') or 'black').lower().strip()
+
+    if not person_file:
+        return jsonify({'error': 'Person photo is required'}), 400
+    if not logo_file:
+        return jsonify({'error': 'Company logo is required'}), 400
+
+    try:
+        color_map = {
+            'black': (16,  23,  32),    # #101720
+            'pink':  (255, 0,   119),   # #FF0077
+        }
+        bg_rgb = color_map.get(bg_color, (16, 23, 32))
+        W, H   = 1200, 700
+
+        # ── Remove backgrounds ─────────────────────────────────────────────────
+        print('[talkdata] removing person background…', flush=True)
+        person_img = _remove_bg(person_file.read())
+        print('[talkdata] removing logo background…', flush=True)
+        logo_img   = _remove_bg(logo_file.read())
+
+        # ── Canvas ────────────────────────────────────────────────────────────
+        canvas = Image.new('RGB', (W, H), bg_rgb)
+
+        # ── Person: scale to canvas height, anchor bottom-left ────────────────
+        pw_orig, ph_orig = person_img.size
+        ph = H
+        pw = int(pw_orig * ph / ph_orig)
+
+        # Cap at 55% of canvas width so the logo half stays clear
+        max_pw = int(W * 0.55)   # 660 px
+        if pw > max_pw:
+            pw = max_pw
+            ph = int(ph_orig * pw / pw_orig)
+
+        person_resized = person_img.resize((pw, ph), Image.LANCZOS)
+        py = H - ph   # bottom-align
+        canvas.paste(person_resized, (0, py), person_resized)
+        print(f'[talkdata] person: {pw}×{ph} at (0,{py})', flush=True)
+
+        # ── Logo: fit centred in right half ───────────────────────────────────
+        right_x = W // 2   # 600 px
+        pad     = 60
+        max_lw  = W - right_x - pad * 2   # 480 px
+        max_lh  = H - pad * 2              # 580 px
+
+        lw_orig, lh_orig = logo_img.size
+        scale     = min(max_lw / lw_orig, max_lh / lh_orig)
+        lw_scaled = max(1, int(lw_orig * scale))
+        lh_scaled = max(1, int(lh_orig * scale))
+        logo_resized = logo_img.resize((lw_scaled, lh_scaled), Image.LANCZOS)
+
+        lx = right_x + (W - right_x - lw_scaled) // 2
+        ly = (H - lh_scaled) // 2
+        canvas.paste(logo_resized, (lx, ly), logo_resized)
+        print(f'[talkdata] logo: {lw_scaled}×{lh_scaled} at ({lx},{ly})', flush=True)
+
+        # ── Output ────────────────────────────────────────────────────────────
+        buf = io.BytesIO()
+        canvas.save(buf, format='PNG', optimize=True)
+        buf.seek(0)
+        b64 = base64.b64encode(buf.read()).decode('utf-8')
+        return jsonify({'ok': True, 'image': f'data:image/png;base64,{b64}'})
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Generation failed: {e}'}), 500
+
+
 if __name__ == "__main__":
     # Railway sets PORT; fallback to FLASK_PORT for local dev
     port = int(os.environ.get("PORT", os.environ.get("FLASK_PORT", 5001)))

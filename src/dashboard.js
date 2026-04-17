@@ -43,7 +43,7 @@ async function _getDashUser() {
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
-import { apiFetch as _authFetch, supabase } from './supabase.js'
+import { apiFetch as _authFetch, apiUpload, supabase } from './supabase.js'
 
 async function apiFetch(url, opts = {}) {
   const res = await _authFetch(url, opts)
@@ -1081,7 +1081,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   })
 }
 
-// ── Talk data to me placeholder ───────────────────────────────────────────────
+// ── Talk data to me ───────────────────────────────────────────────────────────
 function showTalkDataForm(blogMeta, csvRows, currentIndex) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const overlay = document.createElement('div')
@@ -1091,46 +1091,99 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
       <div class="tmpl-picker-header">
         <div>
           <h2 class="tmpl-picker-title">Talk data to me</h2>
-          <p class="tmpl-picker-subtitle">Upload the assets needed to build your thumbnail</p>
+          <p class="tmpl-picker-subtitle">${escHtml(blogMeta.title)}</p>
         </div>
         <button class="tmpl-picker-close" id="talk-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
       <div class="blog-form" style="gap:16px">
-        <p style="color:#94A3B8;font-size:14px;line-height:1.6">
-          The <strong style="color:#E2E8F0">Talk data to me</strong> thumbnail requires a photo of a person (looking at the camera) and a company logo. The background will be black or pink.
-        </p>
+        <div id="talk-error" class="blog-form-error" style="display:none"></div>
+
         <div class="blog-form-field">
-          <label class="blog-form-label">Person photo</label>
+          <label class="blog-form-label">Person photo <span class="blog-form-required">*</span></label>
+          <p class="blog-form-hint-text">Photo of a person facing the camera. Background will be removed automatically.</p>
           <input class="blog-form-input" id="talk-person" type="file" accept="image/*" style="padding:8px" />
         </div>
+
         <div class="blog-form-field">
-          <label class="blog-form-label">Company logo</label>
+          <label class="blog-form-label">Company logo <span class="blog-form-required">*</span></label>
+          <p class="blog-form-hint-text" style="color:#f59e0b">
+            ${lucideSVG('alert-triangle', 12, 'currentColor')} Logo must be full white. Any background will be removed automatically.
+          </p>
           <input class="blog-form-input" id="talk-logo" type="file" accept="image/*" style="padding:8px" />
         </div>
+
         <div class="blog-form-field">
           <label class="blog-form-label">Background colour</label>
-          <div style="display:flex;gap:12px;margin-top:4px">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#E2E8F0;font-size:14px">
-              <input type="radio" name="talk-bg" value="black" checked /> Black
-            </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:#E2E8F0;font-size:14px">
-              <input type="radio" name="talk-bg" value="pink" /> Pink (#FF0077)
-            </label>
+          <div style="display:flex;gap:12px;margin-top:8px">
+            <button type="button" class="talk-color-btn active" data-color="black"
+              style="background:#101720;color:#fff;border:2px solid var(--pink);padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+              Black
+            </button>
+            <button type="button" class="talk-color-btn" data-color="pink"
+              style="background:#FF0077;color:#fff;border:2px solid transparent;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">
+              Pink
+            </button>
           </div>
         </div>
+
         <div class="blog-form-actions" style="margin-top:8px">
           <button class="blog-form-cancel" id="talk-cancel">Cancel</button>
-          <button class="blog-form-submit" disabled style="opacity:0.5;cursor:not-allowed">
-            ${lucideSVG('clock', 14, 'currentColor')} Coming soon
+          <button class="blog-form-submit" id="talk-generate">
+            ${lucideSVG('image', 14, 'currentColor')} Generate thumbnail
           </button>
         </div>
       </div>
     </div>
   `
   _mount.appendChild(overlay)
-  overlay.querySelector('#talk-close').addEventListener('click', () => overlay.remove())
+  overlay.querySelector('#talk-close').addEventListener('click',  () => overlay.remove())
   overlay.querySelector('#talk-cancel').addEventListener('click', () => overlay.remove())
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+
+  // Colour toggle
+  let selectedColor = 'black'
+  overlay.querySelectorAll('.talk-color-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      selectedColor = btn.dataset.color
+      overlay.querySelectorAll('.talk-color-btn').forEach(b => {
+        b.style.borderColor = b === btn ? 'var(--pink)' : 'transparent'
+      })
+    })
+  })
+
+  // Generate
+  overlay.querySelector('#talk-generate').addEventListener('click', async () => {
+    const personFile = overlay.querySelector('#talk-person').files[0]
+    const logoFile   = overlay.querySelector('#talk-logo').files[0]
+    const errEl      = overlay.querySelector('#talk-error')
+
+    errEl.style.display = 'none'
+    if (!personFile) { errEl.textContent = 'Please upload a person photo.'; errEl.style.display = 'block'; return }
+    if (!logoFile)   { errEl.textContent = 'Please upload a company logo.';  errEl.style.display = 'block'; return }
+
+    const btn = overlay.querySelector('#talk-generate')
+    btn.disabled = true
+    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Removing backgrounds…`
+
+    try {
+      const formData = new FormData()
+      formData.append('person',  personFile)
+      formData.append('logo',    logoFile)
+      formData.append('bgColor', selectedColor)
+
+      const res  = await apiUpload('/api/thumbnail/talkdata', formData)
+      const data = await res.json()
+      if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+
+      overlay.remove()
+      showThumbnailResult(blogMeta, data.image, csvRows, currentIndex, null, 0, null)
+    } catch (err) {
+      errEl.textContent = err.message || 'Generation failed — try again'
+      errEl.style.display = 'block'
+      btn.disabled = false
+      btn.innerHTML = `${lucideSVG('image', 14, 'currentColor')} Generate thumbnail`
+    }
+  })
 }
 
 async function onNewTemplate(typeId = 'blog-thumbnail', blogMeta = null) {
