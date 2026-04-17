@@ -9,6 +9,9 @@ WORKDIR /app
 COPY requirements-server.txt .
 RUN pip install -r requirements-server.txt
 
+# Pre-download the rembg model at build time so the first request doesn't timeout
+RUN python -c "from rembg import new_session; new_session('u2net_human_seg')"
+
 COPY . .
 
 EXPOSE 8080
