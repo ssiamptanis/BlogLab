@@ -1298,8 +1298,27 @@ def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
         rng = random.Random(attempt * 999)
         rng.shuffle(photos)
 
+    # Filter out black-and-white images using Pexels' avg_color field.
+    # B&W images have R ≈ G ≈ B; if all channels differ by < 12 it's greyscale.
+    def _is_color(p):
+        hex_col = (p.get('avg_color') or '#888888').lstrip('#')
+        if len(hex_col) != 6:
+            return True
+        r, g, b = int(hex_col[0:2], 16), int(hex_col[2:4], 16), int(hex_col[4:6], 16)
+        return max(abs(r - g), abs(g - b), abs(r - b)) >= 12
+
+    photos = [p for p in photos if _is_color(p)]
+
     selected = photos[:count]
-    return [{'id': str(p['id']), 'url': p['src']['large2x'], 'preview': p['src']['large'],
+
+    # For portrait/audiences queries use the Pexels 'portrait' URL (800×1200) —
+    # not 'large2x' which is a landscape CDN crop and defeats portrait composition.
+    def _img_url(p):
+        if is_portrait_query and p['src'].get('portrait'):
+            return p['src']['portrait']
+        return p['src']['large2x']
+
+    return [{'id': str(p['id']), 'url': _img_url(p), 'preview': p['src']['large'],
              'photographer': p['photographer'], 'source': 'pexels'} for p in selected]
 
 

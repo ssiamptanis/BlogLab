@@ -834,9 +834,15 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
       subtitles: overlay.querySelector('#blog-subtitles').value.trim(),
       category:  overlay.querySelector('#blog-category').value.trim(),
     }
+    const VALID_CATEGORIES = new Set(['audiences', 'consumer behaviour', 'digital trends', 'data journalism', 'talk data to me', 'product', 'strategy'])
     if (!blogMeta.title) return
     if (!blogMeta.category) {
       showBlogFormError(overlay, 'Category is required — please enter one of the listed categories')
+      overlay.querySelector('#blog-category').focus()
+      return
+    }
+    if (!VALID_CATEGORIES.has(blogMeta.category.toLowerCase())) {
+      showBlogFormError(overlay, 'Please check again your spelling')
       overlay.querySelector('#blog-category').focus()
       return
     }
