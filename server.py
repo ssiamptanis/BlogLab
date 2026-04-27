@@ -305,24 +305,30 @@ def list_templates():
     if cached:
         return jsonify(cached)
 
-    # Use admin client so RLS doesn't restrict cross-user reads.
-    # We enforce privacy in Python: show ALL of the current user's records
-    # (any status) but only SAVED records from other users (drafts stay private).
-    admin = _sb_admin()
-    res = admin.table("templates") \
-               .select("id,user_id,name,status,folder_id,template_type,created_at,updated_at,block_count,block_types,thumb,doc") \
-               .or_(f"user_id.eq.{g.user_id},status.eq.saved") \
-               .order("updated_at", desc=True) \
-               .execute()
+    try:
+        sb = _sb_user()
+        res = sb.table("templates") \
+                 .select("id,user_id,name,status,folder_id,template_type,created_at,updated_at,block_count,block_types,thumb,doc") \
+                 .order("updated_at", desc=True) \
+                 .execute()
+        print(f'[templates] fetched {len(res.data)} rows for user {g.user_id}', flush=True)
+    except Exception as e:
+        print(f'[templates] query error: {e}', flush=True)
+        traceback.print_exc()
+        return jsonify({'templates': [], 'folders': [], 'error': str(e)}), 200
 
-    # Folders are personal — keep scoped to the current user
-    sb = _sb_user()
-    folders_res = sb.table("folders") \
-                    .select("*") \
-                    .eq("user_id", g.user_id) \
-                    .order("created_at") \
-                    .execute()
-    # Extract author info from doc — avoids sending full block payloads to dashboard
+    try:
+        folders_res = sb.table("folders") \
+                        .select("*") \
+                        .eq("user_id", g.user_id) \
+                        .order("created_at") \
+                        .execute()
+    except Exception as e:
+        print(f'[templates] folders query error: {e}', flush=True)
+        folders_res_data = []
+    else:
+        folders_res_data = folders_res.data
+
     templates = []
     for t in res.data:
         doc = t.pop("doc", None) or {}
@@ -331,7 +337,7 @@ def list_templates():
         t["doc_image_url"]     = doc.get("previewJpeg") or doc.get("imageUrl", "")
         t["doc_category"]      = (doc.get("blogMeta") or {}).get("category", "")
         templates.append(t)
-    data = {"templates": templates, "folders": folders_res.data}
+    data = {"templates": templates, "folders": folders_res_data}
     _templates_cache_set(g.user_id, data)
     return jsonify(data)
 
