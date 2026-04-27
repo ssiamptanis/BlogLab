@@ -341,6 +341,36 @@ function showToast(msg, type = 'success') {
   setTimeout(() => t.classList.remove('show'), 3000)
 }
 
+// ── Custom confirm dialog ─────────────────────────────────────────────────────
+function confirmModal(message) {
+  return new Promise(resolve => {
+    const _mount = (_root && document.contains(_root)) ? _root : document.body
+    const overlay = document.createElement('div')
+    overlay.className = 'blog-form-overlay tmpl-picker-overlay'
+    overlay.style.cssText = 'z-index:2000'
+    overlay.innerHTML = `
+      <div class="tmpl-picker-modal" style="width:420px;max-width:92vw;padding:32px 28px">
+        <p style="font-size:15px;font-weight:600;color:#fff;margin:0 0 24px;text-align:center;line-height:1.5">
+          ${escHtml(message)}
+        </p>
+        <div style="display:flex;gap:12px;justify-content:center">
+          <button id="conf-cancel" class="blog-form-cancel" style="min-width:100px">Cancel</button>
+          <button id="conf-ok" class="blog-form-submit" style="min-width:100px;background:#e53935">
+            ${lucideSVG('trash-2', 14, 'currentColor')} Delete
+          </button>
+        </div>
+      </div>
+    `
+    _mount.appendChild(overlay)
+
+    const close = (result) => { overlay.remove(); resolve(result) }
+    overlay.querySelector('#conf-ok').addEventListener('click',     () => close(true))
+    overlay.querySelector('#conf-cancel').addEventListener('click', () => close(false))
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(false) })
+    overlay.addEventListener('keydown', e => { if (e.key === 'Escape') close(false) })
+  })
+}
+
 // ── Template type definitions ─────────────────────────────────────────────────
 
 const INSIGHT_REPORT_PREVIEW = `<svg viewBox="0 0 200 283" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -758,9 +788,17 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
         <div class="blog-form-field">
           <label class="blog-form-label" for="blog-category">
             Category <span class="blog-form-required">*</span>
-            <span class="blog-form-hint">(Audiences, Consumer behaviour, Digital trends, Data journalism, Talk data to me, Product, Strategy)</span>
           </label>
-          <input class="blog-form-input" id="blog-category" type="text" value="${(prefill?.category || '').replace(/"/g, '&quot;')}" placeholder="e.g. Digital trends" />
+          <select class="blog-form-input" id="blog-category">
+            <option value="" disabled ${!prefill?.category ? 'selected' : ''}>Select a category…</option>
+            <option value="audiences"           ${(prefill?.category||'').toLowerCase() === 'audiences'            ? 'selected' : ''}>Audiences</option>
+            <option value="consumer behaviour"  ${(prefill?.category||'').toLowerCase() === 'consumer behaviour'   ? 'selected' : ''}>Consumer behaviour</option>
+            <option value="digital trends"      ${(prefill?.category||'').toLowerCase() === 'digital trends'       ? 'selected' : ''}>Digital trends</option>
+            <option value="data journalism"     ${(prefill?.category||'').toLowerCase() === 'data journalism'      ? 'selected' : ''}>Data journalism</option>
+            <option value="talk data to me"     ${(prefill?.category||'').toLowerCase() === 'talk data to me'      ? 'selected' : ''}>Talk data to me</option>
+            <option value="product"             ${(prefill?.category||'').toLowerCase() === 'product'              ? 'selected' : ''}>Product</option>
+            <option value="strategy"            ${(prefill?.category||'').toLowerCase() === 'strategy'             ? 'selected' : ''}>Strategy</option>
+          </select>
         </div>
 
         ${!isBulk ? `
@@ -829,15 +867,9 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
       subtitles: overlay.querySelector('#blog-subtitles').value.trim(),
       category:  overlay.querySelector('#blog-category').value.trim(),
     }
-    const VALID_CATEGORIES = new Set(['audiences', 'consumer behaviour', 'digital trends', 'data journalism', 'talk data to me', 'product', 'strategy'])
     if (!blogMeta.title) return
     if (!blogMeta.category) {
-      showBlogFormError(overlay, 'Category is required — please enter one of the listed categories')
-      overlay.querySelector('#blog-category').focus()
-      return
-    }
-    if (!VALID_CATEGORIES.has(blogMeta.category.toLowerCase())) {
-      showBlogFormError(overlay, 'Please check again your spelling')
+      showBlogFormError(overlay, 'Please select a category')
       overlay.querySelector('#blog-category').focus()
       return
     }
@@ -1988,7 +2020,8 @@ async function onCardAction(e) {
   }
 
   else if (action === 'delete') {
-    if (!confirm(`Delete "${tmpl.name}"?`)) return
+    const confirmed = await confirmModal('Are you sure you want to delete this?')
+    if (!confirmed) return
     try {
       await apiFetch(`/api/templates/${id}`, { method: 'DELETE' })
       _templates = _templates.filter(t => t.id !== id)

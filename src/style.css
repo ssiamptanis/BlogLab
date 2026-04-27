@@ -3450,6 +3450,20 @@ body, html { overflow-x: hidden; }
   color: #3D4F6B;
 }
 
+select.blog-form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236B7A99' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 36px;
+  cursor: pointer;
+}
+select.blog-form-input option {
+  background: #0D1420;
+  color: #E2E8F0;
+}
+
 .blog-form-textarea {
   resize: vertical;
   min-height: 80px;
@@ -5035,3 +5049,5 @@ body, html { overflow-x: hidden; }
 .dash-mob-menu-btn    { display: none; }
 .dash-mob-create-btn  { display: none; }
 .mobile-editor-nav    { display: none; }
+/* Toolbar has no visible content on desktop — collapse it */
+.dash-toolbar         { display: none; }
