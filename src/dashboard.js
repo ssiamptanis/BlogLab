@@ -1027,6 +1027,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
 
       // Generate a small JPEG preview (360×210) from the composed imageDataUrl
       // so the dashboard card always shows exactly what the user agreed to download
+      // Generate small preview JPEG for card display (360×210)
       const previewJpeg = await new Promise(resolve => {
         const img = new Image()
         img.onload = () => {
@@ -1039,6 +1040,26 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         img.src = imageDataUrl
       })
 
+      // Upload full-res PNG to Supabase Storage so it can be re-downloaded later
+      let composedUrl = null
+      try {
+        const blob = await fetch(imageDataUrl).then(r => r.blob())
+        const path = `thumbnails/${userId}/${crypto.randomUUID()}.png`
+        const { error: upErr } = await supabase.storage
+          .from('abx-images')
+          .upload(path, blob, { contentType: 'image/png' })
+        if (!upErr) {
+          const { data: signData } = await supabase.storage
+            .from('abx-images')
+            .createSignedUrl(path, 60 * 60 * 24 * 365 * 10)  // 10-year signed URL
+          composedUrl = signData?.signedUrl || null
+        } else {
+          console.warn('[save] storage upload failed:', upErr)
+        }
+      } catch (upEx) {
+        console.warn('[save] storage upload error:', upEx)
+      }
+
       const { data: record, error } = await supabase
         .from('templates')
         .insert({
@@ -1047,7 +1068,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           status:        'saved',
           folder_id:     null,
           template_type: 'blog-thumbnail',
-          doc:           { imageUrl: sourceImageUrl, previewJpeg, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
+          doc:           { imageUrl: sourceImageUrl, previewJpeg, composedUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
           block_count:   0,
           block_types:   [],
         })
@@ -1059,6 +1080,8 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
       _templates.unshift({
         ...record,
         doc_image_url:     previewJpeg || sourceImageUrl || '',
+        doc_composed_url:  composedUrl || '',
+        doc_source_url:    sourceImageUrl || '',
         doc_author:        user.name      || '',
         doc_author_avatar: user.avatarUrl || '',
       })
@@ -1958,9 +1981,12 @@ function onCardOpen(e) {
 }
 
 function _showBlogThumbnailCardDialog(tmpl) {
-  const _mount = (_root && document.contains(_root)) ? _root : document.body
-  const imageUrl  = tmpl.doc_image_url || ''
-  const safeTitle = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  const _mount      = (_root && document.contains(_root)) ? _root : document.body
+  const previewUrl  = tmpl.doc_image_url   || ''  // small preview for display
+  const sourceUrl   = tmpl.doc_source_url  || ''  // original Pexels/Unsplash URL for recompose
+  const composedUrl = tmpl.doc_composed_url || ''  // full-res PNG in Storage (best)
+  const imageUrl    = previewUrl                   // display only
+  const safeTitle   = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
 
   const overlay = document.createElement('div')
   overlay.className = 'blog-form-overlay tmpl-picker-overlay'
@@ -1995,24 +2021,40 @@ function _showBlogThumbnailCardDialog(tmpl) {
   overlay.querySelector('#thumb-card-download')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget
     btn.disabled = true
-    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
+
     try {
-      const res = await apiFetch('/api/thumbnail/compose', {
-        method: 'POST',
-        body: JSON.stringify({ imageUrl })
-      })
-      if (res.error) throw new Error(res.error)
-      const a = document.createElement('a')
-      a.href     = res.image
-      a.download = `${safeTitle}_thumbnail.png`
-      a.click()
-      btn.disabled = false
-      btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
+      let href = null
+
+      if (composedUrl) {
+        // Best path: full-res PNG stored in Supabase Storage — direct download
+        btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Downloading…`
+        href = composedUrl
+      } else if (sourceUrl && sourceUrl.startsWith('http')) {
+        // Legacy path: recompose from original Pexels/Unsplash URL
+        btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
+        const res = await apiFetch('/api/thumbnail/compose', {
+          method: 'POST',
+          body: JSON.stringify({ imageUrl: sourceUrl })
+        })
+        if (res.error) throw new Error(res.error)
+        href = res.image
+      } else if (previewUrl) {
+        // Last resort: download whatever preview is stored
+        href = previewUrl
+      }
+
+      if (href) {
+        const a = document.createElement('a')
+        a.href     = href
+        a.download = `${safeTitle}_thumbnail.png`
+        a.click()
+      }
     } catch (err) {
       showToast(`Download failed: ${err.message}`, 'error')
-      btn.disabled = false
-      btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
     }
+
+    btn.disabled = false
+    btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
   })
 }
 
