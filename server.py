@@ -39,9 +39,10 @@ CORS(app, resources={r"/api/*": {"origins": "*"}},
 
 from supabase import create_client, Client as SupabaseClient
 
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_KEY = os.environ["SUPABASE_KEY"]          # anon/public key
-SUPABASE_JWT_SECRET = os.environ.get("SUPABASE_JWT_SECRET", "")
+SUPABASE_URL         = os.environ["SUPABASE_URL"]
+SUPABASE_KEY         = os.environ["SUPABASE_KEY"]          # anon/public key
+SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")  # service role (bypasses RLS)
+SUPABASE_JWT_SECRET  = os.environ.get("SUPABASE_JWT_SECRET", "")
 
 _sb: SupabaseClient = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -100,6 +101,16 @@ def _sb_user():
     client.postgrest.auth(g.token)
     client.storage._client.headers["Authorization"] = f"Bearer {g.token}"
     return client
+
+
+def _sb_admin():
+    """Return a Supabase client using the service role key (bypasses RLS).
+    Use only for reads that intentionally cross user boundaries — never for writes.
+    Falls back to the user-scoped client if SUPABASE_SERVICE_KEY is not set.
+    """
+    from supabase import create_client
+    key = SUPABASE_SERVICE_KEY or SUPABASE_KEY
+    return create_client(SUPABASE_URL, key)
 
 
 # ── Static asset dirs (icons + fonts stay local on the server) ────────────────
@@ -293,11 +304,19 @@ def list_templates():
     cached = _templates_cache_get(g.user_id)
     if cached:
         return jsonify(cached)
+
+    # Use admin client so RLS doesn't restrict cross-user reads.
+    # We enforce privacy in Python: show ALL of the current user's records
+    # (any status) but only SAVED records from other users (drafts stay private).
+    admin = _sb_admin()
+    res = admin.table("templates") \
+               .select("id,user_id,name,status,folder_id,template_type,created_at,updated_at,block_count,block_types,thumb,doc") \
+               .or_(f"user_id.eq.{g.user_id},status.eq.saved") \
+               .order("updated_at", desc=True) \
+               .execute()
+
+    # Folders are personal — keep scoped to the current user
     sb = _sb_user()
-    res = sb.table("templates") \
-             .select("id,user_id,name,status,folder_id,template_type,created_at,updated_at,block_count,block_types,thumb,doc") \
-             .order("updated_at", desc=True) \
-             .execute()
     folders_res = sb.table("folders") \
                     .select("*") \
                     .eq("user_id", g.user_id) \
