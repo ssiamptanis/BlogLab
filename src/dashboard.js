@@ -69,6 +69,11 @@ async function loadData() {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Inline spinning wheel for button loading states */
+function spinnerHTML(size = 14) {
+  return `<span class="page-spinner" style="width:${size}px;height:${size}px;border-width:2px;display:inline-block;vertical-align:middle;flex-shrink:0"></span>`
+}
+
 function formatDate(iso) {
   if (!iso) return ''
   const d = new Date(iso)
@@ -610,7 +615,7 @@ async function ensureSparkFolder() {
 async function onSparkGenerate(overlay, audience, topic, templateType = 'insight-report') {
   const btn = overlay.querySelector('#spark-generate')
   btn.disabled = true
-  btn.innerHTML = `${lucideSVG('loader', 15, '#fff')} Querying GWI Spark…`
+  btn.innerHTML = `${spinnerHTML(15)} Querying GWI Spark…`
 
   const steps = [
     `Pulling primary insights on <strong>${audience}</strong> × <strong>${topic}</strong>…`,
@@ -875,7 +880,7 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
     }
     const btn = overlay.querySelector('#blog-form-submit')
     btn.disabled = true
-    btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Generating…`
+    btn.innerHTML = `${spinnerHTML()} Generating…`
     hideFormError(overlay)
 
     try {
@@ -918,9 +923,9 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
   const usedIds = []
 
   const isFigma = result.type === 'figma'
-  // Figma picker: 3 options in a compact 3-column layout, no scrolling needed
+  // Figma picker: compact layout — 3 cols, wraps to fit however many options there are
   const pickerModalStyle = isFigma
-    ? 'style="width:760px;max-width:96vw"'
+    ? 'style="width:900px;max-width:96vw"'
     : ''
   const pickerGridStyle  = isFigma
     ? 'style="grid-template-columns:repeat(3,1fr);max-height:none;overflow:visible"'
@@ -943,8 +948,8 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
           <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
             <img class="thumb-picker-img" src="${opt.preview || opt.url}" alt="Option ${i + 1}" loading="lazy" />
             <div class="thumb-picker-label" style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px 7px;width:100%">
-              <span>Option ${i + 1}</span>
-              ${!isFigma ? `<span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em">${opt.source || 'pexels'}</span>` : ''}
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isFigma && opt.name ? escHtml(opt.name) : `Option ${i + 1}`}</span>
+              ${!isFigma ? `<span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;margin-left:6px">${opt.source || 'pexels'}</span>` : ''}
             </div>
           </button>
         `).join('')}
@@ -967,7 +972,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
   overlay.querySelector('#thumb-try-again').addEventListener('click', async () => {
     const btn = overlay.querySelector('#thumb-try-again')
     btn.disabled = true
-    btn.innerHTML = `<span class="page-spinner" style="width:14px;height:14px;border-width:2px"></span> Fetching…`
+    btn.innerHTML = `${spinnerHTML()} Fetching…`
     try {
       _attempt += 1
       const newResult = await apiFetch('/api/thumbnail/generate', {
@@ -1070,7 +1075,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   overlay.querySelector('#thumb-result-save').addEventListener('click', async (e) => {
     const btn = e.currentTarget
     btn.disabled = true
-    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Saving…`
+    btn.innerHTML = `${spinnerHTML()} Saving…`
 
     try {
       const user = await _getDashUser()
@@ -1266,7 +1271,7 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
       </div>
       <div class="blog-form" style="gap:16px">
         <canvas id="iadj-canvas" style="width:100%;border-radius:6px;display:block;background:#111"></canvas>
-        <div id="iadj-loading" style="text-align:center;font-size:13px;color:var(--text-secondary);margin-top:-8px">Loading image…</div>
+        <div id="iadj-loading" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:-8px"><span class="page-spinner" style="width:16px;height:16px;border-width:2px"></span><span style="font-size:13px;color:var(--text-secondary)">Loading image…</span></div>
 
         <div style="max-width:420px;margin:0 auto;width:100%">
           <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:#fff">Image adjustments</p>
@@ -1347,7 +1352,7 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
     const btn   = overlay.querySelector('#iadj-use')
     const errEl = overlay.querySelector('#iadj-error')
     btn.disabled = true
-    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
+    btn.innerHTML = `${spinnerHTML()} Composing…`
     errEl.style.display = 'none'
     try {
       const res = await apiFetch('/api/thumbnail/compose', {
@@ -1672,7 +1677,7 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
 
     const btn = overlay.querySelector('#talk-generate')
     btn.disabled = true
-    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Removing backgrounds…`
+    btn.innerHTML = `${spinnerHTML()} Removing backgrounds…`
 
     try {
       // Resize both files to max 1000px wide/tall before uploading — keeps
@@ -2009,7 +2014,7 @@ async function onCardAction(e) {
   else if (action === 'download-thumb') {
     btn.disabled = true
     const origIcon = btn.innerHTML
-    btn.innerHTML = lucideSVG('loader', 14, 'currentColor')
+    btn.innerHTML = spinnerHTML()
     try {
       await _downloadThumbnail(tmpl)
     } catch (e) {
@@ -2161,7 +2166,7 @@ function _showBlogThumbnailCardDialog(tmpl) {
   overlay.querySelector('#thumb-card-download')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget
     btn.disabled = true
-    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Downloading…`
+    btn.innerHTML = `${spinnerHTML()} Downloading…`
     try {
       await _downloadThumbnail(tmpl)
     } catch (err) {
