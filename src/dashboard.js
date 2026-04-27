@@ -170,6 +170,7 @@ function cardHTML(t) {
         ${(mine || isBlogThumb) ? `
           <button class="tmpl-action-btn" data-action="rename" data-id="${t.id}" title="Rename">${lucideSVG('pencil', 14, 'currentColor')}</button>
           ${!isBlogThumb ? `<button class="tmpl-action-btn" data-action="duplicate" data-id="${t.id}" title="Duplicate">${lucideSVG('copy', 14, 'currentColor')}</button>` : ''}
+          ${isBlogThumb ? `<button class="tmpl-action-btn" data-action="download-thumb" data-id="${t.id}" title="Download">${lucideSVG('download', 14, 'currentColor')}</button>` : ''}
           <button class="tmpl-action-btn danger" data-action="delete" data-id="${t.id}" title="Delete">${lucideSVG('trash-2', 14, 'currentColor')}</button>
         ` : `
           <button class="tmpl-action-btn" data-action="copy-to-mine" data-id="${t.id}" title="Make a copy">${lucideSVG('copy-plus', 14, 'currentColor')} Make a copy</button>
@@ -1054,9 +1055,12 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           composedUrl = signData?.signedUrl || null
         } else {
           console.warn('[save] storage upload failed:', upErr)
+          // Visible warning — download from card won't be full-res without this
+          showToast('Saved, but full-res storage upload failed — card download may be low-res', 'error')
         }
       } catch (upEx) {
         console.warn('[save] storage upload error:', upEx)
+        showToast('Saved, but full-res storage upload failed — card download may be low-res', 'error')
       }
 
       const { data: record, error } = await supabase
@@ -1096,11 +1100,26 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
   })
 
   // ── Download PNG ─────────────────────────────────────────────────────────────
-  overlay.querySelector('#thumb-result-download').addEventListener('click', () => {
-    const a = document.createElement('a')
-    a.href     = imageDataUrl
-    a.download = `${safeTitle}_thumbnail.png`
-    a.click()
+  overlay.querySelector('#thumb-result-download').addEventListener('click', async () => {
+    // Convert data URL to a blob URL so the browser always shows a save dialog,
+    // not an inline preview (same approach as _downloadThumbnail)
+    try {
+      const blob = await fetch(imageDataUrl).then(r => r.blob())
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href     = blobUrl
+      a.download = `${safeTitle}_thumbnail.png`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10_000)
+    } catch {
+      // Fallback: direct data URL (older browsers)
+      const a = document.createElement('a')
+      a.href     = imageDataUrl
+      a.download = `${safeTitle}_thumbnail.png`
+      a.click()
+    }
   })
 
   overlay.querySelector('#thumb-result-next')?.addEventListener('click', () => {
@@ -1933,6 +1952,19 @@ async function onCardAction(e) {
     } catch (e) { showToast('Duplicate failed', 'error') }
   }
 
+  else if (action === 'download-thumb') {
+    btn.disabled = true
+    const origIcon = btn.innerHTML
+    btn.innerHTML = lucideSVG('loader', 14, 'currentColor')
+    try {
+      await _downloadThumbnail(tmpl)
+    } catch (e) {
+      showToast(`Download failed: ${e.message}`, 'error')
+    }
+    btn.disabled = false
+    btn.innerHTML = origIcon
+  }
+
   else if (action === 'delete') {
     if (!confirm(`Delete "${tmpl.name}"?`)) return
     try {
@@ -1980,14 +2012,66 @@ function onCardOpen(e) {
   _navigate(`/editor/${id}`)
 }
 
+/** Download a saved blog thumbnail.
+ *  Priority: composedUrl (Storage) → recompose from sourceUrl → previewUrl fallback.
+ *  Always forces a file-save dialog by fetching cross-origin URLs as blobs first.
+ */
+async function _downloadThumbnail(tmpl) {
+  const composedUrl  = tmpl.doc_composed_url || ''
+  const sourceUrl    = tmpl.doc_source_url   || ''
+  const previewUrl   = tmpl.doc_image_url    || ''
+  const adjustParams = tmpl.doc_adjust_params || null
+  const safeTitle    = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+
+  let href = null
+  let mimeType = 'image/png'
+
+  if (composedUrl) {
+    // Best path: full-res PNG from Supabase Storage — fetch as blob to force save dialog
+    const resp = await fetch(composedUrl)
+    if (!resp.ok) throw new Error(`Storage fetch failed: ${resp.status}`)
+    href = URL.createObjectURL(await resp.blob())
+  } else if (sourceUrl && sourceUrl.startsWith('http')) {
+    // Legacy: recompose from original Pexels/Unsplash URL using saved crop params
+    const res = await apiFetch('/api/thumbnail/compose', {
+      method: 'POST',
+      body: JSON.stringify({
+        imageUrl: sourceUrl,
+        scale:    adjustParams?.scale   ?? 1.0,
+        offsetX:  adjustParams?.offsetX ?? 0,
+        offsetY:  adjustParams?.offsetY ?? 0,
+      })
+    })
+    if (res.error) throw new Error(res.error)
+    // data: URL — convert to blob so browser shows save dialog
+    const blob = await fetch(res.image).then(r => r.blob())
+    href = URL.createObjectURL(blob)
+  } else {
+    // No full-res source available (Talk data thumbnails saved before Storage was wired up,
+    // or a storage upload that failed silently). Can't reconstruct 1200×700 here.
+    throw new Error(
+      'Full-resolution image not available for this card. ' +
+      'Re-generate the thumbnail and download directly from the result screen, ' +
+      'or re-save it to create a fresh high-res copy.'
+    )
+  }
+
+  if (!href) throw new Error('No image available to download')
+
+  const a = document.createElement('a')
+  a.href     = href
+  a.download = `${safeTitle}_thumbnail.png`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+
+  // Revoke blob URL after a short delay to free memory
+  if (href.startsWith('blob:')) setTimeout(() => URL.revokeObjectURL(href), 10_000)
+}
+
 function _showBlogThumbnailCardDialog(tmpl) {
-  const _mount       = (_root && document.contains(_root)) ? _root : document.body
-  const previewUrl   = tmpl.doc_image_url    || ''   // small preview for display
-  const sourceUrl    = tmpl.doc_source_url   || ''   // original Pexels/Unsplash URL for recompose
-  const composedUrl  = tmpl.doc_composed_url || ''   // full-res PNG in Storage (best)
-  const adjustParams = tmpl.doc_adjust_params || null // crop params saved at creation time
-  const imageUrl     = previewUrl                    // display only
-  const safeTitle   = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
+  const _mount   = (_root && document.contains(_root)) ? _root : document.body
+  const imageUrl = tmpl.doc_image_url || ''  // preview for display only
 
   const overlay = document.createElement('div')
   overlay.className = 'blog-form-overlay tmpl-picker-overlay'
@@ -2022,43 +2106,12 @@ function _showBlogThumbnailCardDialog(tmpl) {
   overlay.querySelector('#thumb-card-download')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget
     btn.disabled = true
-
+    btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Downloading…`
     try {
-      let href = null
-
-      if (composedUrl) {
-        // Best path: full-res PNG stored in Supabase Storage — direct download
-        btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Downloading…`
-        href = composedUrl
-      } else if (sourceUrl && sourceUrl.startsWith('http')) {
-        // Legacy path: recompose from original Pexels/Unsplash URL
-        btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
-        const res = await apiFetch('/api/thumbnail/compose', {
-          method: 'POST',
-          body: JSON.stringify({
-            imageUrl: sourceUrl,
-            scale:    adjustParams?.scale   ?? 1.0,
-            offsetX:  adjustParams?.offsetX ?? 0,
-            offsetY:  adjustParams?.offsetY ?? 0,
-          })
-        })
-        if (res.error) throw new Error(res.error)
-        href = res.image
-      } else if (previewUrl) {
-        // Last resort: download whatever preview is stored
-        href = previewUrl
-      }
-
-      if (href) {
-        const a = document.createElement('a')
-        a.href     = href
-        a.download = `${safeTitle}_thumbnail.png`
-        a.click()
-      }
+      await _downloadThumbnail(tmpl)
     } catch (err) {
       showToast(`Download failed: ${err.message}`, 'error')
     }
-
     btn.disabled = false
     btn.innerHTML = `${lucideSVG('download', 14, 'currentColor')} Download PNG`
   })
