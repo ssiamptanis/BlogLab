@@ -961,7 +961,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
 }
 
 // ── Thumbnail result (save / download / next) ────────────────────────────────
-function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0, sourceImageUrl = null) {
+function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentIndex = 0, pickerResult = null, pickerAttempt = 0, sourceImageUrl = null, adjustParams = null) {
   const _mount = (_root && document.contains(_root)) ? _root : document.body
   const isBulk    = csvRows && csvRows.length > 1
   const hasNext   = isBulk && currentIndex < csvRows.length - 1
@@ -1025,16 +1025,15 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         userId = session?.user?.id || null
       }
 
-      // Generate a small JPEG preview (360×210) from the composed imageDataUrl
+      // Generate a JPEG preview (720×420) from the composed imageDataUrl
       // so the dashboard card always shows exactly what the user agreed to download
-      // Generate small preview JPEG for card display (360×210)
       const previewJpeg = await new Promise(resolve => {
         const img = new Image()
         img.onload = () => {
           const c = document.createElement('canvas')
-          c.width = 360; c.height = 210
-          c.getContext('2d').drawImage(img, 0, 0, 360, 210)
-          resolve(c.toDataURL('image/jpeg', 0.85))
+          c.width = 720; c.height = 420
+          c.getContext('2d').drawImage(img, 0, 0, 720, 420)
+          resolve(c.toDataURL('image/jpeg', 0.92))
         }
         img.onerror = () => resolve(null)
         img.src = imageDataUrl
@@ -1068,7 +1067,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
           status:        'saved',
           folder_id:     null,
           template_type: 'blog-thumbnail',
-          doc:           { imageUrl: sourceImageUrl, previewJpeg, composedUrl, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
+          doc:           { imageUrl: sourceImageUrl, previewJpeg, composedUrl, adjustParams, blogMeta, docAuthor: user.name, docAuthorAvatar: user.avatarUrl },
           block_count:   0,
           block_types:   [],
         })
@@ -1082,6 +1081,7 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         doc_image_url:     previewJpeg || sourceImageUrl || '',
         doc_composed_url:  composedUrl || '',
         doc_source_url:    sourceImageUrl || '',
+        doc_adjust_params: adjustParams || null,
         doc_author:        user.name      || '',
         doc_author_avatar: user.avatarUrl || '',
       })
@@ -1282,7 +1282,7 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
         body: JSON.stringify({ imageUrl, scale: userScale, offsetX, offsetY }),
       })
       overlay.remove()
-      showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, attempt, imageUrl)
+      showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, attempt, imageUrl, { scale: userScale, offsetX, offsetY })
     } catch (err) {
       errEl.textContent = 'Composition failed — try again'
       errEl.style.display = 'block'
@@ -1981,11 +1981,12 @@ function onCardOpen(e) {
 }
 
 function _showBlogThumbnailCardDialog(tmpl) {
-  const _mount      = (_root && document.contains(_root)) ? _root : document.body
-  const previewUrl  = tmpl.doc_image_url   || ''  // small preview for display
-  const sourceUrl   = tmpl.doc_source_url  || ''  // original Pexels/Unsplash URL for recompose
-  const composedUrl = tmpl.doc_composed_url || ''  // full-res PNG in Storage (best)
-  const imageUrl    = previewUrl                   // display only
+  const _mount       = (_root && document.contains(_root)) ? _root : document.body
+  const previewUrl   = tmpl.doc_image_url    || ''   // small preview for display
+  const sourceUrl    = tmpl.doc_source_url   || ''   // original Pexels/Unsplash URL for recompose
+  const composedUrl  = tmpl.doc_composed_url || ''   // full-res PNG in Storage (best)
+  const adjustParams = tmpl.doc_adjust_params || null // crop params saved at creation time
+  const imageUrl     = previewUrl                    // display only
   const safeTitle   = (tmpl.name || 'thumbnail').replace(/[^a-z0-9]/gi, '_').toLowerCase()
 
   const overlay = document.createElement('div')
@@ -2034,7 +2035,12 @@ function _showBlogThumbnailCardDialog(tmpl) {
         btn.innerHTML = `${lucideSVG('loader', 14, 'currentColor')} Composing…`
         const res = await apiFetch('/api/thumbnail/compose', {
           method: 'POST',
-          body: JSON.stringify({ imageUrl: sourceUrl })
+          body: JSON.stringify({
+            imageUrl: sourceUrl,
+            scale:    adjustParams?.scale   ?? 1.0,
+            offsetX:  adjustParams?.offsetX ?? 0,
+            offsetY:  adjustParams?.offsetY ?? 0,
+          })
         })
         if (res.error) throw new Error(res.error)
         href = res.image

@@ -337,6 +337,7 @@ def list_templates():
         t["doc_image_url"]     = doc.get("previewJpeg") or doc.get("imageUrl", "")
         t["doc_source_url"]    = doc.get("imageUrl", "")      # original Pexels/Unsplash URL for recompose
         t["doc_composed_url"]  = doc.get("composedUrl", "")   # full-res PNG in Supabase Storage
+        t["doc_adjust_params"] = doc.get("adjustParams")      # {scale, offsetX, offsetY} from user crop
         t["doc_category"]      = (doc.get("blogMeta") or {}).get("category", "")
         templates.append(t)
     data = {"templates": templates, "folders": folders_res_data}
