@@ -158,7 +158,6 @@ function cardHTML(t) {
       <div class="tmpl-card-thumb">
         ${thumbHTML}
         <span class="tmpl-status-badge ${statusClass} tmpl-status-thumb">${statusLabel}</span>
-        ${!mine ? `<div class="tmpl-card-viewonly-badge">${lucideSVG('eye', 10, 'currentColor')} View only</div>` : ''}
       </div>
       <div class="tmpl-card-body">
         ${typeLabel ? `<div class="tmpl-card-type-label">${typeLabel}</div>` : ''}
@@ -168,7 +167,7 @@ function cardHTML(t) {
         <div class="tmpl-card-date">${formatDate(t.updated_at)}</div>
       </div>
       <div class="tmpl-card-actions">
-        ${mine ? `
+        ${(mine || isBlogThumb) ? `
           <button class="tmpl-action-btn" data-action="rename" data-id="${t.id}" title="Rename">${lucideSVG('pencil', 14, 'currentColor')}</button>
           ${!isBlogThumb ? `<button class="tmpl-action-btn" data-action="duplicate" data-id="${t.id}" title="Duplicate">${lucideSVG('copy', 14, 'currentColor')}</button>` : ''}
           <button class="tmpl-action-btn danger" data-action="delete" data-id="${t.id}" title="Delete">${lucideSVG('trash-2', 14, 'currentColor')}</button>
