@@ -19,7 +19,6 @@ let _folders = []
 let _filter = 'mine'         // 'all' | 'mine' | 'saved' | 'draft'
 let _currentUserId = null   // set from Supabase session
 let _activeFolderId = null   // null = show all folders
-let _search = ''
 let _showSettings = false    // settings panel open
 let _globalEventsRegistered = false
 
@@ -97,10 +96,7 @@ function filteredTemplates() {
     if (_filter === 'saved' && t.status !== 'saved')   return false
     if (_filter === 'draft' && t.status !== 'draft')   return false
     if (_activeFolderId && t.folder_id !== _activeFolderId) return false
-    if (_search) {
-      const q = _search.toLowerCase()
-      if (!t.name.toLowerCase().includes(q)) return false
-    }
+
     return true
   })
 }
@@ -212,8 +208,8 @@ function gridHTML() {
   if (!list.length) {
     return `<div class="dash-empty">
       <div class="dash-empty-icon">${lucideSVG('file-plus', 40, '#CED9EB')}</div>
-      <h3>${_search ? 'No results found' : 'Create new thumbnail(s)'}</h3>
-      <p>${_search ? 'Try a different search.' : 'Click "+ Create new thumbnail(s)" to get started.'}</p>
+      <h3>Create new thumbnail(s)</h3>
+      <p>Click "+ Create new thumbnail(s)" to get started.</p>
     </div>`
   }
 
@@ -266,10 +262,6 @@ function renderDashboardHTML() {
             <button class="dash-mob-menu-btn" id="dash-mob-menu" title="Menu">
               ${lucideSVG('menu', 20, 'currentColor')}
             </button>
-            <div class="dash-search-wrap">
-              <span class="dash-search-icon">${lucideSVG('search', 15, 'var(--pink)')}</span>
-              <input class="dash-search" id="dash-search" placeholder="Search templates…" value="${escHtml(_search)}" />
-            </div>
             <!-- Create button: mobile only (mirrors sidebar button) -->
             <button class="btn btn-primary dash-mob-create-btn" id="dash-mob-new">+ New</button>
           </div>
@@ -2488,12 +2480,6 @@ function bindEvents() {
   _root.querySelectorAll('.dash-folder-rename').forEach(b => b.addEventListener('click', onRenameFolder))
   _root.querySelectorAll('.dash-folder-delete').forEach(b => b.addEventListener('click', onDeleteFolder))
 
-  // Search
-  _root.querySelector('#dash-search')?.addEventListener('input', e => {
-    _search = e.target.value
-    refreshGrid()
-  })
-
   // Global window listeners — registered once ever
   if (!_globalEventsRegistered) {
     _globalEventsRegistered = true
@@ -2531,7 +2517,6 @@ export async function renderDashboard(root, { navigate }) {
   _navigate = navigate
   _filter = 'mine'
   _activeFolderId = null
-  _search = ''
   _showSettings = false
 
   if (_dataLoaded) {

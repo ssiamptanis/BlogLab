@@ -3104,8 +3104,8 @@ body, html { overflow-x: hidden; }
 .dash-sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: var(--white);
-  border-right: 1px solid var(--grey-3);
+  background: var(--black);
+  border-right: 1px solid rgba(255,255,255,0.08);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -3118,7 +3118,7 @@ body, html { overflow-x: hidden; }
 
 .dash-sidebar-section {
   padding: 0 12px 16px;
-  border-bottom: 1px solid var(--grey-3);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
   margin-bottom: 16px;
   display: flex;
   flex-direction: column;
@@ -3135,7 +3135,7 @@ body, html { overflow-x: hidden; }
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--grey-5);
+  color: rgba(255,255,255,0.35);
   margin-bottom: 6px;
   padding: 0 4px;
 }
@@ -3151,14 +3151,14 @@ body, html { overflow-x: hidden; }
   font-size: 13px;
   font-weight: 500;
   font-family: var(--font);
-  color: var(--grey-7);
+  color: rgba(255,255,255,0.65);
   cursor: pointer;
   transition: all var(--transition);
 }
-.dash-filter-btn:hover { background: var(--grey-1); color: var(--off-black); }
+.dash-filter-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
 .dash-filter-btn.active {
-  background: var(--pink-bg);
-  color: var(--pink-dark);
+  background: rgba(255,0,119,0.18);
+  color: var(--pink);
   font-weight: 700;
 }
 
@@ -3171,10 +3171,10 @@ body, html { overflow-x: hidden; }
   cursor: pointer;
   transition: background var(--transition);
   font-size: 13px;
-  color: var(--grey-7);
+  color: rgba(255,255,255,0.65);
 }
-.dash-folder-btn:hover { background: var(--grey-1); }
-.dash-folder-btn.active { background: var(--pink-bg); color: var(--pink-dark); font-weight: 600; }
+.dash-folder-btn:hover { background: rgba(255,255,255,0.08); color: #fff; }
+.dash-folder-btn.active { background: rgba(255,0,119,0.18); color: var(--pink); font-weight: 600; }
 
 .dash-folder-icon { font-size: 14px; flex-shrink: 0; }
 .dash-folder-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3187,14 +3187,14 @@ body, html { overflow-x: hidden; }
   font-size: 11px;
   padding: 2px 4px;
   border-radius: 4px;
-  color: var(--grey-5);
+  color: rgba(255,255,255,0.35);
   opacity: 0;
   transition: opacity var(--transition);
 }
 .dash-folder-btn:hover .dash-folder-rename,
 .dash-folder-btn:hover .dash-folder-delete { opacity: 1; }
-.dash-folder-rename:hover { color: var(--pink) !important; background: var(--pink-bg); }
-.dash-folder-delete:hover { color: var(--error); background: #FEF2F2; }
+.dash-folder-rename:hover { color: var(--pink) !important; background: rgba(255,0,119,0.15); }
+.dash-folder-delete:hover { color: #ff6b6b; background: rgba(255,59,48,0.15); }
 
 .dash-folder-add {
   display: flex;
@@ -3202,18 +3202,18 @@ body, html { overflow-x: hidden; }
   gap: 6px;
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1.5px dashed var(--grey-4);
+  border: 1.5px dashed rgba(255,255,255,0.2);
   background: transparent;
   font-size: 12px;
   font-weight: 600;
   font-family: var(--font);
-  color: var(--grey-5);
+  color: rgba(255,255,255,0.4);
   cursor: pointer;
   transition: all var(--transition);
   margin-top: 4px;
   width: 100%;
 }
-.dash-folder-add:hover { border-color: var(--pink); color: var(--pink); background: var(--pink-bg); }
+.dash-folder-add:hover { border-color: var(--pink); color: var(--pink); background: rgba(255,0,119,0.12); }
 
 /* Inline folder name input */
 .dash-folder-inline-input {
@@ -3223,8 +3223,8 @@ body, html { overflow-x: hidden; }
   border-radius: 6px;
   font-size: 13px;
   font-family: var(--font);
-  background: var(--white);
-  color: var(--off-black);
+  background: rgba(255,255,255,0.06);
+  color: #fff;
   outline: none;
   margin-top: 4px;
 }
@@ -3233,8 +3233,8 @@ body, html { overflow-x: hidden; }
 .tmpl-card.dragging { opacity: 0.45; transform: scale(0.97); }
 .dash-folder-btn.drag-over,
 .dash-filter-btn.drag-over {
-  background: var(--pink-bg) !important;
-  color: var(--pink-dark) !important;
+  background: rgba(255,0,119,0.18) !important;
+  color: var(--pink) !important;
   outline: 2px dashed var(--pink);
   outline-offset: -2px;
 }
@@ -3881,39 +3881,6 @@ body, html { overflow-x: hidden; }
   gap: 12px;
 }
 
-.dash-search-wrap {
-  position: relative;
-  max-width: 320px;
-  flex: 0 0 auto;
-}
-
-.dash-search-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  pointer-events: none;
-}
-
-.dash-search {
-  width: 100%;
-  padding: 7px 12px 7px 36px;
-  border: 1px solid var(--grey-3);
-  border-radius: var(--radius);
-  background: var(--white);
-  font-size: 13px;
-  font-family: var(--font);
-  font-weight: 400;
-  color: var(--off-black);
-  outline: none;
-  transition: border-color 0.15s;
-  line-height: 1.4;
-  box-sizing: border-box;
-}
-.dash-search::placeholder { color: var(--grey-4); }
-.dash-search:focus { border-color: var(--pink); }
 
 /* Settings button — far right of toolbar */
 .dash-settings-btn {
@@ -4985,7 +4952,6 @@ body, html { overflow-x: hidden; }
     padding: 10px 12px;
     flex-wrap: nowrap;
   }
-  .dash-search-wrap { flex: 1; max-width: none; }
 
   /* Hamburger button — shown only on mobile */
   .dash-mob-menu-btn {
