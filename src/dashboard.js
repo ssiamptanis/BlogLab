@@ -246,7 +246,7 @@ function renderDashboardHTML() {
           </div>
           <div class="dash-sidebar-section">
             <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">My files</button>
-            <button class="dash-filter-btn ${_filter === 'all'   ? 'active' : ''}" data-filter="all">All files</button>
+            <button class="dash-filter-btn ${_filter === 'all'   ? 'active' : ''}" data-filter="all">Files across GWI</button>
           </div>
           <div class="dash-sidebar-section">
             <div class="dash-sidebar-label">Folders</div>
@@ -893,10 +893,19 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
   const isBulk = csvRows && csvRows.length > 1
   const usedIds = []
 
+  const isFigma = result.type === 'figma'
+  // Figma picker: 3 options in a compact 3-column layout, no scrolling needed
+  const pickerModalStyle = isFigma
+    ? 'style="width:760px;max-width:96vw"'
+    : ''
+  const pickerGridStyle  = isFigma
+    ? 'style="grid-template-columns:repeat(3,1fr);max-height:none;overflow:visible"'
+    : ''
+
   const overlay = document.createElement('div')
   overlay.className = 'blog-form-overlay tmpl-picker-overlay'
   overlay.innerHTML = `
-    <div class="tmpl-picker-modal thumb-picker-modal">
+    <div class="tmpl-picker-modal thumb-picker-modal" ${pickerModalStyle}>
       <div class="tmpl-picker-header">
         <div>
           <h2 class="tmpl-picker-title">Choose your thumbnail</h2>
@@ -905,13 +914,13 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
         <button class="tmpl-picker-close" id="thumb-picker-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
 
-      <div class="thumb-picker-grid" id="thumb-picker-grid">
+      <div class="thumb-picker-grid" id="thumb-picker-grid" ${pickerGridStyle}>
         ${result.options.map((opt, i) => `
           <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
             <img class="thumb-picker-img" src="${opt.preview || opt.url}" alt="Option ${i + 1}" loading="lazy" />
             <div class="thumb-picker-label" style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px 7px;width:100%">
               <span>Option ${i + 1}</span>
-              <span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em">${opt.source || 'pexels'}</span>
+              ${!isFigma ? `<span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em">${opt.source || 'pexels'}</span>` : ''}
             </div>
           </button>
         `).join('')}
@@ -921,7 +930,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
 
       <div class="thumb-picker-actions">
         <button class="blog-form-cancel" id="thumb-try-again">${lucideSVG('refresh-cw', 14, 'currentColor')} Try again</button>
-        <span class="thumb-picker-hint">Select an image to compose your thumbnail</span>
+        <span class="thumb-picker-hint">Select an image to ${isFigma ? 'use as your thumbnail' : 'compose your thumbnail'}</span>
       </div>
     </div>
   `
@@ -952,11 +961,32 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
     }
   })
 
-  // Select image → adjustment screen (user crops/positions before composing)
+  // Select image
+  // Figma (Product/Strategy): compose immediately — no adjustment screen needed
+  // Pexels/Unsplash: open adjustment screen so user can crop/position first
   overlay.querySelectorAll('.thumb-picker-card').forEach(card => {
-    card.addEventListener('click', () => {
-      overlay.remove()
-      showImageAdjust(blogMeta, card.dataset.url, csvRows, currentIndex, result, _attempt)
+    card.addEventListener('click', async () => {
+      if (isFigma) {
+        // Disable all cards while composing
+        overlay.querySelectorAll('.thumb-picker-card').forEach(c => { c.disabled = true; c.style.opacity = '0.5' })
+        const errEl = overlay.querySelector('#thumb-picker-error')
+        errEl.style.display = 'none'
+        try {
+          const res = await apiFetch('/api/thumbnail/compose', {
+            method: 'POST',
+            body: JSON.stringify({ imageUrl: card.dataset.url }),
+          })
+          overlay.remove()
+          showThumbnailResult(blogMeta, res.image, csvRows, currentIndex, result, _attempt, card.dataset.url)
+        } catch (err) {
+          overlay.querySelectorAll('.thumb-picker-card').forEach(c => { c.disabled = false; c.style.opacity = '' })
+          errEl.textContent = 'Composition failed — try again'
+          errEl.style.display = 'block'
+        }
+      } else {
+        overlay.remove()
+        showImageAdjust(blogMeta, card.dataset.url, csvRows, currentIndex, result, _attempt)
+      }
     })
   })
 }
