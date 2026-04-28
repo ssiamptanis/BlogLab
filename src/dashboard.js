@@ -243,7 +243,7 @@ function renderDashboardHTML() {
         <!-- Left sidebar -->
         <aside class="dash-sidebar">
           <div class="dash-sidebar-top">
-            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px">+ Create new thumbnail(s)</button>
+            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px;background:#00FF88;border-color:#00FF88;color:#000">+ Create new thumbnail(s)</button>
           </div>
           <div class="dash-sidebar-section">
             <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">My files</button>

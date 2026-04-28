@@ -76,19 +76,8 @@ export function titlebarHTML({ activeTabId = null, currentName = '', isHome = fa
         </a>
       </div>
 
-      <a href="/dash" class="tb-home${isHome ? ' active' : ''}" title="Dashboard" style="-webkit-app-region:no-drag">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M6.5 14.5v-4h3v4H13V8h2L8 1.5 1 8h2v6.5z" fill="currentColor"/>
-        </svg>
-      </a>
-
       <div class="tb-tabs" style="-webkit-app-region:no-drag">
         ${tabsHTML}
-        <button class="tb-new-tab" id="tb-new-tab" title="New file" style="-webkit-app-region:no-drag">
-          <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-            <path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
       </div>
 
       <div class="tb-filename" style="-webkit-app-region:no-drag;display:none">
