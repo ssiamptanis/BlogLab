@@ -5,7 +5,13 @@ let _supabase = null
 // Fetch Supabase credentials from the server at runtime (no build-time env vars needed).
 // All code that uses `supabase` is safe as long as it runs after `supabaseReady` resolves.
 export const supabaseReady = fetch('/api/config')
-  .then(r => r.json())
+  .then(async r => {
+    if (!r.ok) throw new Error(`/api/config returned HTTP ${r.status}`)
+    const text = await r.text()
+    try { return JSON.parse(text) } catch {
+      throw new Error(`/api/config returned non-JSON (first 100 chars): ${text.slice(0, 100)}`)
+    }
+  })
   .then(({ supabaseUrl, supabaseAnonKey }) => {
     if (!supabaseUrl || !supabaseAnonKey) {
       throw new Error('Server did not return Supabase credentials from /api/config')
