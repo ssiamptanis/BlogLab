@@ -979,7 +979,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
       ${!isFigma ? `
       <div class="thumb-picker-guidance">
         <span class="thumb-picker-guidance-icon">${lucideSVG('alert-triangle', 15, 'currentColor')}</span>
-        <span>Please select an image that features a <strong>single, clear focal point</strong>, with a <strong>simple and uncluttered composition</strong>.</span>
+        <span>Please select an image with a <strong>single, clear focal point</strong>, using a <strong>simple, uncluttered composition</strong>. Ideally the image will have plenty of <strong>negative space</strong> and a <strong>clean, minimal colour background</strong> if possible.</span>
       </div>` : ''}
 
       <div class="thumb-picker-grid" id="thumb-picker-grid" ${pickerGridStyle}>
