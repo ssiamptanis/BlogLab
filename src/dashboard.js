@@ -976,6 +976,12 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
         <button class="tmpl-picker-close" id="thumb-picker-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
 
+      ${!isFigma ? `
+      <div class="thumb-picker-guidance">
+        <span class="thumb-picker-guidance-icon">${lucideSVG('alert-triangle', 15, 'currentColor')}</span>
+        <span>Please select an image that features a <strong>single, clear focal point</strong>, with a <strong>simple and uncluttered composition</strong>.</span>
+      </div>` : ''}
+
       <div class="thumb-picker-grid" id="thumb-picker-grid" ${pickerGridStyle}>
         ${result.options.map((opt, i) => `
           <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
