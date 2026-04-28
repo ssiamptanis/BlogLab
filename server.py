@@ -1547,7 +1547,7 @@ def generate_thumbnail_options():
     # Figma categories
     if category in FIGMA_CATEGORIES:
         page_name = 'Strategy' if category == 'strategy' else 'Product'
-        figma_count = 6 if category == 'product' else 3
+        figma_count = 6
         try:
             options = _get_figma_frames(page_name, count=figma_count, exclude_ids=exclude_ids)
             return jsonify({'type': 'figma', 'category': category,

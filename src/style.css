@@ -998,7 +998,7 @@ body {
 .page-spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid rgba(255,255,255,0.15);
+  border: 3px solid rgba(255,255,255,0.35);
   border-top-color: rgba(255,255,255,0.85);
   border-radius: 50%;
   animation: page-spin 0.7s linear infinite;
@@ -3483,6 +3483,10 @@ select.blog-form-input option {
 }
 
 .blog-form-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid #2a2a2a;
   border-radius: 8px;
@@ -3542,7 +3546,7 @@ select.blog-form-input option {
 
 .blog-form-csv-label {
   font-size: 13px;
-  color: #64748B;
+  color: #888888;
   flex: 1;
 }
 
@@ -3568,15 +3572,25 @@ select.blog-form-input option {
 }
 
 .blog-form-csv-template {
-  font-size: 12px;
-  color: #475569;
-  text-decoration: underline;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #94A3B8;
+  font-size: 13px;
+  font-family: inherit;
+  padding: 7px 14px;
   cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
 }
 
 .blog-form-csv-template:hover {
-  color: #94A3B8;
+  border-color: var(--pink);
+  color: var(--pink);
 }
 
 .blog-form-error {
@@ -4383,6 +4397,10 @@ select.blog-form-input option {
 .tmpl-status-draft {
   background: #666666;
   color: #ffffff;
+}
+.tmpl-status-category {
+  background: #ffffff;
+  color: #000000;
 }
 
 .tmpl-card-actions {

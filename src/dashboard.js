@@ -137,8 +137,10 @@ function _authorAvatarHTML(name, avatarUrl) {
 function cardHTML(t) {
   const folder = t.folder_id ? getFolderName(t.folder_id) : null
   const isBlogThumb = t.template_type === 'blog-thumbnail'
-  const statusClass = t.status === 'saved' ? 'tmpl-status-saved' : 'tmpl-status-draft'
   const rawCategory = (t.doc_category || '').trim()
+  const statusClass = isBlogThumb && rawCategory
+    ? 'tmpl-status-category'
+    : t.status === 'saved' ? 'tmpl-status-saved' : 'tmpl-status-draft'
   const statusLabel = isBlogThumb && rawCategory
     ? rawCategory.replace(/\b\w/g, c => c.toUpperCase())   // title-case
     : t.status === 'saved' ? 'Saved' : 'Draft'
@@ -813,7 +815,7 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
             ${lucideSVG('upload', 14, 'currentColor')} Upload CSV
             <input type="file" id="blog-csv-input" accept=".csv" style="display:none" />
           </label>
-          <a class="blog-form-csv-template" id="blog-csv-download" href="#">Download template</a>
+          <a class="blog-form-csv-template" id="blog-csv-download" href="#">${lucideSVG('download', 14, 'currentColor')} Download template</a>
         </div>
         ` : ''}
 
@@ -948,7 +950,7 @@ function showThumbnailPicker(blogMeta, result, csvRows = null, currentIndex = 0,
           <button class="thumb-picker-card" data-url="${opt.url}" data-index="${i}">
             <img class="thumb-picker-img" src="${opt.preview || opt.url}" alt="Option ${i + 1}" loading="lazy" />
             <div class="thumb-picker-label" style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px 7px;width:100%">
-              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isFigma && opt.name ? escHtml(opt.name) : `Option ${i + 1}`}</span>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${isFigma && opt.name ? escHtml(opt.name.replace(/^product thumbnail[\s\-–—:]+/i, '').trim()) : `Option ${i + 1}`}</span>
               ${!isFigma ? `<span style="font-size:10px;opacity:0.45;text-transform:uppercase;letter-spacing:0.05em;flex-shrink:0;margin-left:6px">${opt.source || 'pexels'}</span>` : ''}
             </div>
           </button>
