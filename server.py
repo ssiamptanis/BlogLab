@@ -1649,10 +1649,12 @@ def _is_svg(data: bytes) -> bool:
     return sniff.startswith(b'<svg') or sniff.startswith(b'<?xml') or b'<svg' in sniff[:256]
 
 
-def _rasterize_svg(svg_bytes: bytes) -> 'Image.Image':
-    """Convert SVG bytes to a high-resolution RGBA PIL Image using svglib.
-    SVG logos are expected to already have a transparent background, so
-    remove.bg is skipped entirely for SVG uploads.
+def _rasterize_svg_white_logo(svg_bytes: bytes) -> 'Image.Image':
+    """Rasterise a white SVG logo to a transparent RGBA PIL Image.
+    Renders onto a black background, then uses each pixel's luminance as its
+    alpha value — white (255) becomes fully opaque, black (0) becomes fully
+    transparent, anti-aliased greys become semi-transparent. Perfect for
+    white logos and requires no remove.bg call.
     """
     import tempfile
     from svglib.svglib import svg2rlg
@@ -1665,15 +1667,20 @@ def _rasterize_svg(svg_bytes: bytes) -> 'Image.Image':
         drawing = svg2rlg(tmp_path)
         if drawing is None:
             raise ValueError('Could not parse SVG — check the file is valid')
-        # Scale up so the logo renders at a useful resolution
         scale = max(1.0, 600.0 / max(drawing.width or 1, drawing.height or 1))
         drawing.width  *= scale
         drawing.height *= scale
         drawing.transform = (scale, 0, 0, scale, 0, 0)
         buf = io.BytesIO()
-        renderPM.drawToFile(drawing, buf, fmt='PNG', dpi=144)
+        # Black background: white logo pixels → brightness 255, background → 0
+        renderPM.drawToFile(drawing, buf, fmt='PNG', bg=0x000000, dpi=144)
         buf.seek(0)
-        return Image.open(buf).convert('RGBA')
+        rgb = Image.open(buf).convert('RGB')
+        r, g, b = rgb.split()
+        # Luminance channel: average of R,G,B — used directly as alpha
+        luma = Image.merge('RGB', (r, g, b)).convert('L')
+        rgba = Image.merge('RGBA', (r, g, b, luma))
+        return rgba
     finally:
         os.unlink(tmp_path)
 
@@ -1732,14 +1739,14 @@ def generate_talkdata_thumbnail():
         from concurrent.futures import ThreadPoolExecutor
         person_bytes = person_file.read()
         logo_bytes   = logo_file.read()
-        logo_is_svg  = _is_svg(logo_bytes)
-        print(f'[talkdata] logo type: {"SVG (rasterising)" if logo_is_svg else "raster (remove.bg)"}', flush=True)
+        # SVG white logos: rasterise on black bg, use luminance as alpha — no remove.bg needed.
+        # Raster logos: run through remove.bg as normal.
         print('[talkdata] processing images…', flush=True)
-        if logo_is_svg:
-            # SVG logos already have transparency — rasterise directly, skip remove.bg
+        if _is_svg(logo_bytes):
+            print('[talkdata] SVG logo — rasterising with luminance-alpha (no remove.bg)', flush=True)
             with ThreadPoolExecutor(max_workers=1) as pool:
                 f_person = pool.submit(_remove_bg, person_bytes)
-                logo_img = _rasterize_svg(logo_bytes)
+                logo_img = _rasterize_svg_white_logo(logo_bytes)
                 person_img = f_person.result()
         else:
             with ThreadPoolExecutor(max_workers=2) as pool:
@@ -1747,7 +1754,7 @@ def generate_talkdata_thumbnail():
                 f_logo   = pool.submit(_remove_bg, logo_bytes)
                 person_img = f_person.result()
                 logo_img   = f_logo.result()
-        print('[talkdata] backgrounds processed', flush=True)
+        print('[talkdata] images processed', flush=True)
 
         # ── Canvas ────────────────────────────────────────────────────────────
         canvas = Image.new('RGB', (W, H), bg_rgb)
