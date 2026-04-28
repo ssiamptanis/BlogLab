@@ -4218,11 +4218,8 @@ select.blog-form-input option {
 
 /* Others' cards — subtle visual distinction */
 .tmpl-card--others {
-  border-style: dashed;
-  opacity: 0.92;
 }
 .tmpl-card--others:hover {
-  opacity: 1;
 }
 
 /* View-only badge on thumb */

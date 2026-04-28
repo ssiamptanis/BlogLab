@@ -1681,7 +1681,7 @@ function showTalkDataForm(blogMeta, csvRows, currentIndex) {
           <p class="blog-form-hint-text" style="color:#f59e0b">
             ${lucideSVG('alert-triangle', 12, 'currentColor')} Logo must be full white. Any background will be removed automatically.
           </p>
-          <input class="blog-form-input" id="talk-logo" type="file" accept="image/*" style="padding:8px" />
+          <input class="blog-form-input" id="talk-logo" type="file" accept="image/*,image/svg+xml,.svg" style="padding:8px" />
         </div>
 
         <div class="blog-form-actions" style="margin-top:8px">

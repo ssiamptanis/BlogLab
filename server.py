@@ -1643,6 +1643,41 @@ def save_thumbnail():
 REMOVE_BG_API_KEY = os.environ.get('REMOVE_BG_API_KEY', '')
 
 
+def _is_svg(data: bytes) -> bool:
+    """Detect SVG by sniffing the first non-whitespace bytes."""
+    sniff = data.lstrip()[:64].lower()
+    return sniff.startswith(b'<svg') or sniff.startswith(b'<?xml') or b'<svg' in sniff[:256]
+
+
+def _rasterize_svg(svg_bytes: bytes) -> 'Image.Image':
+    """Convert SVG bytes to a high-resolution RGBA PIL Image using svglib.
+    SVG logos are expected to already have a transparent background, so
+    remove.bg is skipped entirely for SVG uploads.
+    """
+    import tempfile
+    from svglib.svglib import svg2rlg
+    from reportlab.graphics import renderPM
+
+    with tempfile.NamedTemporaryFile(suffix='.svg', delete=False) as f:
+        f.write(svg_bytes)
+        tmp_path = f.name
+    try:
+        drawing = svg2rlg(tmp_path)
+        if drawing is None:
+            raise ValueError('Could not parse SVG — check the file is valid')
+        # Scale up so the logo renders at a useful resolution
+        scale = max(1.0, 600.0 / max(drawing.width or 1, drawing.height or 1))
+        drawing.width  *= scale
+        drawing.height *= scale
+        drawing.transform = (scale, 0, 0, scale, 0, 0)
+        buf = io.BytesIO()
+        renderPM.drawToFile(drawing, buf, fmt='PNG', dpi=144)
+        buf.seek(0)
+        return Image.open(buf).convert('RGBA')
+    finally:
+        os.unlink(tmp_path)
+
+
 def _remove_bg(img_bytes):
     """Remove background via remove.bg API. Returns RGBA PIL Image."""
     if not REMOVE_BG_API_KEY:
@@ -1694,16 +1729,25 @@ def generate_talkdata_thumbnail():
         W, H   = 1200, 700
 
         # ── Remove backgrounds in parallel (saves ~10-15s vs sequential) ────────
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from concurrent.futures import ThreadPoolExecutor
         person_bytes = person_file.read()
         logo_bytes   = logo_file.read()
-        print('[talkdata] removing backgrounds in parallel…', flush=True)
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            f_person = pool.submit(_remove_bg, person_bytes)
-            f_logo   = pool.submit(_remove_bg, logo_bytes)
-            person_img = f_person.result()
-            logo_img   = f_logo.result()
-        print('[talkdata] backgrounds removed', flush=True)
+        logo_is_svg  = _is_svg(logo_bytes)
+        print(f'[talkdata] logo type: {"SVG (rasterising)" if logo_is_svg else "raster (remove.bg)"}', flush=True)
+        print('[talkdata] processing images…', flush=True)
+        if logo_is_svg:
+            # SVG logos already have transparency — rasterise directly, skip remove.bg
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                f_person = pool.submit(_remove_bg, person_bytes)
+                logo_img = _rasterize_svg(logo_bytes)
+                person_img = f_person.result()
+        else:
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                f_person = pool.submit(_remove_bg, person_bytes)
+                f_logo   = pool.submit(_remove_bg, logo_bytes)
+                person_img = f_person.result()
+                logo_img   = f_logo.result()
+        print('[talkdata] backgrounds processed', flush=True)
 
         # ── Canvas ────────────────────────────────────────────────────────────
         canvas = Image.new('RGB', (W, H), bg_rgb)
