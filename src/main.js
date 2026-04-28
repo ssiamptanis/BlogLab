@@ -4,7 +4,7 @@ import { renderDashboard, renderSettings, showTemplatePicker,
          preloadDashboard }                             from './dashboard.js'
 import { renderFeedbackPage, mountFeedbackButton }      from './feedback.js'
 import { addTab }                                       from './titlebar.js'
-import { supabase }                                     from './supabase.js'
+import { supabase, supabaseReady }                       from './supabase.js'
 import { renderLogin }                                  from './auth.js'
 
 const root = document.getElementById('app')
@@ -80,4 +80,7 @@ async function boot() {
   startApp()
 }
 
-boot()
+supabaseReady.then(boot).catch(err => {
+  document.getElementById('app').innerHTML =
+    `<div style="padding:40px;font-family:sans-serif;color:#c00">Failed to load app config: ${err.message}</div>`
+})

@@ -1,13 +1,26 @@
 import { createClient } from '@supabase/supabase-js'
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
+let _supabase = null
 
-if (!SUPABASE_URL || !SUPABASE_KEY) {
-  console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in .env')
-}
+// Fetch Supabase credentials from the server at runtime (no build-time env vars needed).
+// All code that uses `supabase` is safe as long as it runs after `supabaseReady` resolves.
+export const supabaseReady = fetch('/api/config')
+  .then(r => r.json())
+  .then(({ supabaseUrl, supabaseAnonKey }) => {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Server did not return Supabase credentials from /api/config')
+    }
+    _supabase = createClient(supabaseUrl, supabaseAnonKey)
+    return _supabase
+  })
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+// Proxy that forwards all property access to the real client once initialized.
+export const supabase = new Proxy({}, {
+  get(_, prop) {
+    if (!_supabase) throw new Error('Supabase not yet initialized — await supabaseReady first')
+    return _supabase[prop]
+  }
+})
 
 /** Get the current session's access token — cached until 60s before expiry */
 let _cachedToken = null

@@ -1083,6 +1083,15 @@ def health():
     return jsonify({"ok": True})
 
 
+@app.route("/api/config")
+def public_config():
+    """Public endpoint — returns Supabase credentials for the frontend to initialise its client."""
+    return jsonify({
+        "supabaseUrl":     SUPABASE_URL,
+        "supabaseAnonKey": SUPABASE_KEY,
+    })
+
+
 @app.route("/api/test/pexels")
 def test_pexels():
     api_key = os.environ.get("PEXELS_API_KEY", "")
