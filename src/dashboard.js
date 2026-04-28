@@ -808,6 +808,14 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
           </select>
         </div>
 
+        <div class="blog-category-preview" id="blog-category-preview" style="display:none">
+          <div class="blog-category-preview-img-wrap">
+            <img class="blog-category-preview-img" id="blog-category-preview-img" src="" alt="" style="display:none" />
+            <div class="blog-category-preview-placeholder" id="blog-category-preview-placeholder"></div>
+          </div>
+          <p class="blog-category-preview-caption" id="blog-category-preview-caption"></p>
+        </div>
+
         ${!isBulk ? `
         <div class="blog-form-csv-row">
           <span class="blog-form-csv-label">Or create multiple thumbnails from a CSV file</span>
@@ -838,6 +846,29 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
   overlay.querySelector('#blog-form-close').addEventListener('click', close)
   overlay.querySelector('#blog-form-cancel').addEventListener('click', close)
   overlay.addEventListener('click', e => { if (e.target === overlay) close() })
+
+  // Category example preview
+  const _catSelect      = overlay.querySelector('#blog-category')
+  const _catPreview     = overlay.querySelector('#blog-category-preview')
+  const _catImg         = overlay.querySelector('#blog-category-preview-img')
+  const _catPlaceholder = overlay.querySelector('#blog-category-preview-placeholder')
+  const _catCaption     = overlay.querySelector('#blog-category-preview-caption')
+
+  function _updateCategoryPreview(category) {
+    if (!category) { _catPreview.style.display = 'none'; return }
+    const slug  = category.toLowerCase().replace(/\s+/g, '-')
+    const label = category.replace(/\b\w/g, c => c.toUpperCase())
+    _catCaption.textContent = `Example of ${label} thumbnail`
+    _catImg.style.display = 'none'
+    _catPlaceholder.style.display = 'flex'
+    _catImg.onload  = () => { _catImg.style.display = 'block'; _catPlaceholder.style.display = 'none' }
+    _catImg.onerror = () => { _catImg.style.display = 'none';  _catPlaceholder.style.display = 'flex' }
+    _catImg.src = `/assets/examples/${slug}.png`
+    _catPreview.style.display = 'block'
+  }
+
+  _catSelect.addEventListener('change', () => _updateCategoryPreview(_catSelect.value))
+  if (prefill?.category) _updateCategoryPreview(prefill.category)
 
   // CSV template download
   overlay.querySelector('#blog-csv-download')?.addEventListener('click', e => {

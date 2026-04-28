@@ -1161,25 +1161,25 @@ _figma_pages_cache = {}
 # a real person facing the camera on a plain solid-colour background.
 _CATEGORY_VISUAL_TERMS = {
     'audiences':          ['portrait', 'person', 'facing camera', 'studio', 'solid color background', 'minimal', 'professional headshot', 'clean backdrop'],
-    'consumer behaviour': ['lifestyle', 'minimal', 'clean', 'simple background', 'everyday', 'product', 'flat lay', 'modern'],
-    'digital trends':     ['technology', 'minimal', 'clean desk', 'simple background', 'digital', 'modern', 'flat lay', 'mobile'],
-    'data journalism':    ['data', 'charts', 'analytics', 'minimal', 'clean', 'simple background', 'flat lay', 'research'],
+    'consumer behaviour': ['lifestyle', 'real photo', 'clean', 'simple background', 'everyday', 'candid', 'natural light', 'modern'],
+    'digital trends':     ['technology', 'real photo', 'desk', 'simple background', 'digital', 'modern', 'office', 'mobile'],
+    'data journalism':    ['research', 'office', 'real photo', 'minimal', 'clean', 'simple background', 'notebook', 'working'],
 }
 
 # Visual angle modifiers for non-audiences categories only.
 # For audiences we always lock to portrait/person, so angles are not applied.
 _VISUAL_ANGLES = [
-    '',                         # attempt 0: no modifier
-    'simple color background',  # attempt 1
-    'studio portrait minimal',  # attempt 2
-    'clean flat lay overhead',  # attempt 3
-    'bright white background',  # attempt 4
-    'pastel background minimal',# attempt 5
+    '',                           # attempt 0: no modifier
+    'simple color background',    # attempt 1
+    'natural light photography',  # attempt 2
+    'candid real photo',          # attempt 3
+    'bright white background',    # attempt 4
+    'studio photography minimal', # attempt 5
 ]
 
 # Global aesthetic modifiers appended to every Pexels query to push toward
-# simple, uncluttered compositions
-_GLOBAL_AESTHETIC = 'minimal simple background clean'
+# real photography with simple, uncluttered compositions
+_GLOBAL_AESTHETIC = 'photograph real photo minimal clean background'
 
 
 def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
@@ -1228,12 +1228,17 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
                 f"Blog title: {title}\nCategory: {category}\n"
                 f"Meta description: {meta_desc or 'N/A'}\n\n"
                 f"Return a JSON object with one key 'query' containing 5-8 keywords "
-                f"for a Pexels image search. The image MUST be simple and minimal — "
+                f"for a Pexels image search. The image MUST be a real photograph — "
+                f"absolutely no illustrations, vectors, digital art, 3D renders, clipart, "
+                f"drawings, or artwork of any kind. Real photography only. "
+                f"The image MUST be simple and minimal — "
                 f"plain or solid-colour background, uncluttered composition, clean layout. "
                 f"Focus on the OVERALL THEME of the title and category, not individual subtitles. "
+                f"Do NOT include words like 'illustration', 'vector', 'flat', 'icon', 'drawing', "
+                f"'clipart', '3d', 'render', or 'art' in the query. "
                 f"Make this attempt visually distinct "
                 f"{'(' + angle_hint + ')' if angle_hint else ''}.\n"
-                f"Example: {{\"query\": \"minimal technology flat lay clean white background\"}}"
+                f"Example: {{\"query\": \"person using laptop coffee shop natural light\"}}"
             )
             res = _requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
@@ -1299,23 +1304,33 @@ def _search_pexels(query, count=3, exclude_ids=None, attempt=0):
     is_portrait_query = any(w in query for w in ('portrait', 'headshot', 'face'))
     orientation = 'portrait' if is_portrait_query else 'landscape'
 
+    _ILLUS_TERMS = {'illustration', 'vector', 'clipart', 'drawing', 'artwork',
+                    'cartoon', 'graphic', 'anime', '3d render', 'digital art', 'painting'}
+
+    def _is_photo(p):
+        """Return False if the Pexels alt text suggests an illustration."""
+        alt = (p.get('alt') or '').lower()
+        return not any(t in alt for t in _ILLUS_TERMS)
+
     res = _requests.get(
         'https://api.pexels.com/v1/search',
         headers={'Authorization': PEXELS_API_KEY},
-        params={'query': query, 'per_page': 40, 'page': page, 'orientation': orientation},
+        params={'query': query, 'per_page': 40, 'page': page,
+                'orientation': orientation, 'content_filter': 'high'},
         timeout=10
     )
-    photos = res.json().get('photos', [])
+    photos = [p for p in res.json().get('photos', []) if _is_photo(p)]
 
     # If portrait returned nothing useful, fall back to landscape
     if not photos and orientation == 'portrait':
         res = _requests.get(
             'https://api.pexels.com/v1/search',
             headers={'Authorization': PEXELS_API_KEY},
-            params={'query': query, 'per_page': 40, 'page': page, 'orientation': 'landscape'},
+            params={'query': query, 'per_page': 40, 'page': page,
+                    'orientation': 'landscape', 'content_filter': 'high'},
             timeout=10
         )
-        photos = res.json().get('photos', [])
+        photos = [p for p in res.json().get('photos', []) if _is_photo(p)]
 
     if exclude_ids:
         photos = [p for p in photos if str(p['id']) not in exclude_ids]
@@ -1389,6 +1404,17 @@ def _search_unsplash(query, count=12, exclude_ids=None, attempt=0):
 
     if exclude_ids:
         photos = [p for p in photos if p['id'] not in (exclude_ids or [])]
+
+    # Filter out illustrations using Unsplash tags
+    _ILLUS_TAGS = {'illustration', 'vector', 'clipart', 'drawing', 'artwork',
+                   'cartoon', 'graphic design', 'anime', '3d render', 'digital art',
+                   'painting', 'art', 'animated', 'comic', 'sketch'}
+
+    def _unsplash_is_photo(p):
+        tags = {(t.get('title') or '').lower() for t in (p.get('tags') or [])}
+        return not tags.intersection(_ILLUS_TAGS)
+
+    photos = [p for p in photos if _unsplash_is_photo(p)]
 
     # Filter B&W using Unsplash's `color` field (same logic as Pexels)
     def _is_color(p):
