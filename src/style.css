@@ -3292,7 +3292,7 @@ body, html { overflow-x: hidden; }
 .tmpl-picker-close {
   background: none;
   border: none;
-  color: #666666;
+  color: rgba(255,255,255,0.45);
   cursor: pointer;
   padding: 4px;
   border-radius: 6px;
@@ -3302,7 +3302,7 @@ body, html { overflow-x: hidden; }
   flex-shrink: 0;
   margin-top: 2px;
 }
-.tmpl-picker-close:hover { background: #242424; color: #dddddd; }
+.tmpl-picker-close:hover { background: #242424; color: #ffffff; }
 
 .tmpl-picker-grid {
   display: grid;
@@ -3488,9 +3488,9 @@ select.blog-form-input option {
   justify-content: center;
   gap: 6px;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 8px;
-  color: #94A3B8;
+  color: rgba(255,255,255,0.55);
   font-size: 14px;
   font-family: inherit;
   padding: 10px 20px;
@@ -3499,8 +3499,8 @@ select.blog-form-input option {
 }
 
 .blog-form-cancel:hover {
-  border-color: #94A3B8;
-  color: #e2e2e2;
+  border-color: rgba(255,255,255,0.55);
+  color: #ffffff;
 }
 
 .blog-form-submit {
@@ -3555,9 +3555,9 @@ select.blog-form-input option {
   align-items: center;
   gap: 6px;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 6px;
-  color: #94A3B8;
+  color: rgba(255,255,255,0.55);
   font-size: 13px;
   font-family: inherit;
   padding: 7px 14px;
@@ -3576,9 +3576,9 @@ select.blog-form-input option {
   align-items: center;
   gap: 6px;
   background: transparent;
-  border: 1px solid #2a2a2a;
+  border: 1px solid rgba(255,255,255,0.2);
   border-radius: 6px;
-  color: #94A3B8;
+  color: rgba(255,255,255,0.55);
   font-size: 13px;
   font-family: inherit;
   padding: 7px 14px;
