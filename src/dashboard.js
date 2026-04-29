@@ -723,7 +723,38 @@ async function _fetchIllustrationUrl() {
 }
 
 // ── CSV parser ────────────────────────────────────────────────────────────────
+
+const _VALID_CATEGORIES = [
+  'audiences',
+  'consumer behaviour',
+  'digital trends',
+  'data journalism',
+  'talk data to me',
+  'product',
+  'strategy',
+]
+
+function normalizeCategory(raw) {
+  if (!raw) return ''
+  const s = raw.toLowerCase().trim()
+    .replace(/\bbehavior\b/g, 'behaviour')   // US → UK spelling
+  // Exact match
+  if (_VALID_CATEGORIES.includes(s)) return s
+  // One contains the other (handles "digital" → "digital trends")
+  const contain = _VALID_CATEGORIES.find(c => c.startsWith(s) || s.startsWith(c))
+  if (contain) return contain
+  // Word-overlap fallback: significant words (>3 chars) mostly match
+  const sWords = s.split(/\s+/).filter(w => w.length > 3)
+  const overlap = _VALID_CATEGORIES.find(c => {
+    const cWords = c.split(/\s+/).filter(w => w.length > 3)
+    return cWords.length > 0 && cWords.every(cw => sWords.some(sw => sw.startsWith(cw.slice(0,4)) || cw.startsWith(sw.slice(0,4))))
+  })
+  return overlap || ''
+}
+
 function parseCSV(text) {
+  // Tokenise properly — handle quoted fields that may contain commas
+  // (but we do NOT support newlines inside quoted fields; use | for multiple subtitles)
   const lines = text.trim().split(/\r?\n/)
   if (lines.length < 2) return []
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''))
@@ -732,8 +763,8 @@ function parseCSV(text) {
   const iMeta     = col('meta')
   const iSubs     = col('sub')
   const iCategory = col('cat')
-  return lines.slice(1).map(line => {
-    // Handle quoted fields
+
+  function splitLine(line) {
     const fields = []
     let cur = '', inQ = false
     for (const ch of line) {
@@ -742,13 +773,26 @@ function parseCSV(text) {
       else cur += ch
     }
     fields.push(cur.trim())
-    return {
-      title:     iTitle    >= 0 ? (fields[iTitle]    || '') : '',
-      metaDesc:  iMeta     >= 0 ? (fields[iMeta]     || '') : '',
-      subtitles: iSubs     >= 0 ? (fields[iSubs]     || '') : '',
-      category:  iCategory >= 0 ? (fields[iCategory] || '') : '',
-    }
-  }).filter(r => r.title)
+    return fields
+  }
+
+  return lines.slice(1)
+    .filter(l => l.trim() && !l.trim().startsWith('#'))  // skip blank + comment lines
+    .map(line => {
+      const fields = splitLine(line)
+      // Subtitles: pipe-separated in the CSV ("Sub one|Sub two") → newline-joined for the textarea
+      const rawSubs = iSubs >= 0 ? (fields[iSubs] || '') : ''
+      const subtitles = rawSubs.includes('|')
+        ? rawSubs.split('|').map(s => s.trim()).join('\n')
+        : rawSubs
+      return {
+        title:     iTitle    >= 0 ? (fields[iTitle]    || '') : '',
+        metaDesc:  iMeta     >= 0 ? (fields[iMeta]     || '') : '',
+        subtitles,
+        category:  normalizeCategory(iCategory >= 0 ? (fields[iCategory] || '') : ''),
+      }
+    })
+    .filter(r => r.title)
 }
 
 // ── Blog thumbnail form ───────────────────────────────────────────────────────
@@ -873,7 +917,14 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
   // CSV template download
   overlay.querySelector('#blog-csv-download')?.addEventListener('click', e => {
     e.preventDefault()
-    const csv = 'title,meta_description,subtitles,category\n"My blog title","Meta description here","Subtitle one\nSubtitle two","Digital trends"'
+    const lines = [
+      '# Valid categories: Audiences | Consumer behaviour | Digital trends | Data journalism | Talk data to me | Product | Strategy',
+      '# For multiple subtitles in one cell, separate them with a pipe character: Subtitle one|Subtitle two',
+      'title,meta_description,subtitles,category',
+      '"The state of social media in 2025","A look at how audiences are engaging with social platforms this year","Why TikTok still leads|The rise of video content","Digital trends"',
+      '"Understanding consumer behaviour","How spending habits are shifting across global markets","","Consumer behaviour"',
+    ]
+    const csv = lines.join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'thumbnail-template.csv' })
     a.click()
