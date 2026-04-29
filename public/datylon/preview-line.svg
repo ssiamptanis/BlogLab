@@ -1,0 +1,26 @@
+<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="180" fill="#111111"/>
+  <text x="16" y="22" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="rgba(255,255,255,0.35)" letter-spacing="1.5">LINE CHART</text>
+  <!-- Grid lines -->
+  <line x1="40" y1="35" x2="300" y2="35" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="65" x2="300" y2="65" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="95" x2="300" y2="95" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="125" x2="300" y2="125" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <!-- Area fill (pink line) -->
+  <path d="M50,110 L100,85 L150,95 L200,50 L250,60 L295,40 L295,130 L50,130 Z" fill="#FF0077" opacity="0.1"/>
+  <polyline points="50,110 100,85 150,95 200,50 250,60 295,40" stroke="#FF0077" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Area fill (white line) -->
+  <path d="M50,120 L100,115 L150,108 L200,95 L250,100 L295,85 L295,130 L50,130 Z" fill="rgba(255,255,255,0.05)"/>
+  <polyline points="50,120 100,115 150,108 200,95 250,100 295,85" stroke="rgba(255,255,255,0.45)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"/>
+  <!-- Dots on pink line -->
+  <circle cx="50"  cy="110" r="3.5" fill="#FF0077"/>
+  <circle cx="100" cy="85"  r="3.5" fill="#FF0077"/>
+  <circle cx="150" cy="95"  r="3.5" fill="#FF0077"/>
+  <circle cx="200" cy="50"  r="3.5" fill="#FF0077"/>
+  <circle cx="250" cy="60"  r="3.5" fill="#FF0077"/>
+  <circle cx="295" cy="40"  r="3.5" fill="#FF0077"/>
+  <!-- Baseline -->
+  <line x1="40" y1="130" x2="300" y2="130" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <!-- Pink bottom accent -->
+  <rect x="0" y="170" width="320" height="3" fill="#FF0077"/>
+</svg>

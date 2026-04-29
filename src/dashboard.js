@@ -215,8 +215,8 @@ function gridHTML() {
   if (!list.length) {
     return `<div class="dash-empty">
       <div class="dash-empty-icon">${lucideSVG('file-plus', 40, '#CED9EB')}</div>
-      <h3>Create new thumbnail(s)</h3>
-      <p>Click "+ Create new thumbnail(s)" to get started.</p>
+      <h3>Create your first asset</h3>
+      <p>Click "+ Create new asset" to get started.</p>
     </div>`
   }
 
@@ -245,7 +245,7 @@ function renderDashboardHTML() {
         <!-- Left sidebar -->
         <aside class="dash-sidebar">
           <div class="dash-sidebar-top">
-            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px;background:#00FF88;border-color:#00FF88;color:#000">+ Create new thumbnail(s)</button>
+            <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px;background:#00FF88;border-color:#00FF88;color:#000">+ Create new asset</button>
           </div>
           <div class="dash-sidebar-section">
             <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">My files</button>
@@ -527,7 +527,79 @@ const TEMPLATE_TYPES = [
     icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>`,
     blocks: []
   },
+  {
+    id: 'graph',
+    name: 'Graph',
+    description: 'Generate on-brand data visualisations using your Datylon templates. Open directly in the Datylon web builder.',
+    preview: null,
+    icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>`,
+    blocks: []
+  },
 ]
+
+// ── Datylon graph templates ───────────────────────────────────────────────────
+// Add your templates here. svgPath = path to the exported SVG in public/datylon/
+// datlylonUrl = full URL of the template in insights.datylon.com
+// ⚠ Replace placeholder entries below with your real Datylon templates.
+// For each template: update name, description, chartType, datlylonUrl,
+// svgPath (exported SVG saved to public/datylon/), and previewUrl (screenshot).
+// series: 'single' | 'multi'
+const GRAPH_TEMPLATES = [
+  {
+    id: 'ff4f8505-ed2e-43ce-b548-7824f48e66ef',
+    name: 'Template 1',
+    description: 'Replace with a description of this chart and when to use it.',
+    chartType: 'Bar chart',
+    series: 'single',
+    datlylonUrl: 'https://insights.datylon.com/create/stories/ff4f8505-ed2e-43ce-b548-7824f48e66ef',
+    svgPath: null,
+    previewUrl: '/datylon/preview-bar.svg',
+  },
+  {
+    id: 'placeholder-line-001',
+    name: 'Template 2',
+    description: 'Replace with a description of this chart and when to use it.',
+    chartType: 'Line chart',
+    series: 'multi',
+    datlylonUrl: 'https://insights.datylon.com',
+    svgPath: null,
+    previewUrl: '/datylon/preview-line.svg',
+  },
+  {
+    id: 'placeholder-donut-001',
+    name: 'Template 3',
+    description: 'Replace with a description of this chart and when to use it.',
+    chartType: 'Donut chart',
+    series: 'single',
+    datlylonUrl: 'https://insights.datylon.com',
+    svgPath: null,
+    previewUrl: '/datylon/preview-donut.svg',
+  },
+  {
+    id: 'placeholder-scatter-001',
+    name: 'Template 4',
+    description: 'Replace with a description of this chart and when to use it.',
+    chartType: 'Scatter plot',
+    series: 'multi',
+    datlylonUrl: 'https://insights.datylon.com',
+    svgPath: null,
+    previewUrl: '/datylon/preview-scatter.svg',
+  },
+]
+
+const _DATYLON_KEY = 'gwi_datylon_downloaded'
+
+function _isDatlylonDownloaded(id) {
+  try { return JSON.parse(localStorage.getItem(_DATYLON_KEY) || '[]').includes(id) }
+  catch { return false }
+}
+
+function _markDatlylonDownloaded(id) {
+  try {
+    const list = JSON.parse(localStorage.getItem(_DATYLON_KEY) || '[]')
+    if (!list.includes(id)) { list.push(id); localStorage.setItem(_DATYLON_KEY, JSON.stringify(list)) }
+  } catch {}
+}
 
 export function showTemplatePicker(navigateFn) {
   // Accept a fresh navigate fn (e.g. when called from editor via event)
@@ -585,6 +657,8 @@ export function showTemplatePicker(navigateFn) {
       overlay.remove()
       if (btn.dataset.type === 'blog-thumbnail') {
         showBlogThumbnailForm()
+      } else if (btn.dataset.type === 'graph') {
+        showGraphTemplates()
       } else {
         await onNewTemplate(btn.dataset.type)
       }
@@ -796,6 +870,133 @@ function parseCSV(text) {
       category:  normalizeCategory(iCategory >= 0 ? (fields[iCategory] || '') : ''),
     }
   }).filter(r => r.title)
+}
+
+// ── Graph template gallery ────────────────────────────────────────────────────
+function showGraphTemplates() {
+  const _mount = (_root && document.contains(_root)) ? _root : document.body
+  _mount.querySelector('.graph-gallery-overlay')?.remove()
+
+  function _cardHTML(t) {
+    const downloaded = _isDatlylonDownloaded(t.id)
+    const preview = t.previewUrl
+      ? `<img class="graph-card-preview" src="${escHtml(t.previewUrl)}" alt="${escHtml(t.name)}" />`
+      : `<div class="graph-card-preview graph-card-preview--placeholder">${lucideSVG('bar-chart-2', 32, 'rgba(255,255,255,0.2)')}</div>`
+
+    return `
+      <div class="graph-card" data-id="${escHtml(t.id)}">
+        ${preview}
+        <div class="graph-card-body">
+          <div class="graph-card-meta">
+            <span class="graph-card-type">${escHtml(t.chartType)}</span>
+            ${downloaded ? `<span class="graph-card-badge graph-card-badge--done">${lucideSVG('check', 11, 'currentColor')} Downloaded</span>` : ''}
+          </div>
+          <div class="graph-card-name">${escHtml(t.name)}</div>
+          <div class="graph-card-desc">${escHtml(t.description)}</div>
+          <div class="graph-card-actions">
+            ${downloaded
+              ? `<a class="graph-btn graph-btn--primary" href="${escHtml(t.datlylonUrl)}" target="_blank" rel="noopener">
+                   ${lucideSVG('external-link', 13, 'currentColor')} Open in Datylon
+                 </a>
+                 ${t.svgPath ? `<button class="graph-btn graph-btn--ghost graph-btn--download" data-id="${escHtml(t.id)}" data-svg="${escHtml(t.svgPath)}">
+                   ${lucideSVG('download', 13, 'currentColor')} Re-download SVG
+                 </button>` : ''}`
+              : `${t.svgPath
+                  ? `<button class="graph-btn graph-btn--primary graph-btn--download" data-id="${escHtml(t.id)}" data-svg="${escHtml(t.svgPath)}">
+                       ${lucideSVG('download', 13, 'currentColor')} Download template
+                     </button>`
+                  : `<button class="graph-btn graph-btn--primary" disabled style="opacity:0.35;cursor:not-allowed">
+                       ${lucideSVG('download', 13, 'currentColor')} Template coming soon
+                     </button>`
+                }
+                 <a class="graph-btn graph-btn--ghost" href="${escHtml(t.datlylonUrl)}" target="_blank" rel="noopener">
+                   ${lucideSVG('external-link', 13, 'currentColor')} Open in Datylon
+                 </a>`
+            }
+          </div>
+        </div>
+      </div>`
+  }
+
+  let _activeFilter = 'all'
+
+  function _filteredTemplates() {
+    if (_activeFilter === 'all') return GRAPH_TEMPLATES
+    return GRAPH_TEMPLATES.filter(t => t.series === _activeFilter)
+  }
+
+  function _renderGrid() {
+    const grid = overlay.querySelector('#graph-gallery-grid')
+    if (!grid) return
+    const templates = _filteredTemplates()
+    grid.innerHTML = templates.length
+      ? templates.map(_cardHTML).join('')
+      : `<p class="graph-gallery-empty">No templates in this category yet.</p>`
+    grid.querySelectorAll('.graph-btn--download').forEach(bindDownloadBtn)
+  }
+
+  const overlay = document.createElement('div')
+  overlay.className = 'graph-gallery-overlay tmpl-picker-overlay'
+  overlay.innerHTML = `
+    <div class="tmpl-picker-modal graph-gallery-modal">
+      <div class="tmpl-picker-header">
+        <div>
+          <h2 class="tmpl-picker-title">Graph templates</h2>
+          <p class="tmpl-picker-subtitle">Select a template — download it once to your Datylon workspace, then open directly next time.</p>
+        </div>
+        <button class="tmpl-picker-close" id="graph-gallery-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+      <div class="graph-gallery-info">
+        ${lucideSVG('info', 13, 'currentColor')}
+        <span>You need a free <a href="https://www.datylon.com/" target="_blank" rel="noopener" class="graph-info-link">Datylon account</a> to edit templates. First time? Download the SVG and upload it via <strong>Workspace → Templates → Upload template</strong> in Datylon.</span>
+      </div>
+      <div class="graph-series-toggle">
+        <button class="graph-series-btn active" data-series="all">All</button>
+        <button class="graph-series-btn" data-series="single">Single series</button>
+        <button class="graph-series-btn" data-series="multi">Multi series</button>
+      </div>
+      <div class="graph-gallery-grid" id="graph-gallery-grid">
+        ${GRAPH_TEMPLATES.map(_cardHTML).join('')}
+      </div>
+    </div>
+  `
+
+  _mount.appendChild(overlay)
+  overlay.querySelector('#graph-gallery-close').addEventListener('click', () => overlay.remove())
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove() })
+
+  // Series toggle
+  overlay.querySelectorAll('.graph-series-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _activeFilter = btn.dataset.series
+      overlay.querySelectorAll('.graph-series-btn').forEach(b => b.classList.toggle('active', b === btn))
+      _renderGrid()
+    })
+  })
+
+  // Download SVG buttons
+  function bindDownloadBtn(btn) {
+    btn.addEventListener('click', async () => {
+      const id  = btn.dataset.id
+      const svg = btn.dataset.svg
+      if (!svg) { showToast('SVG file not configured for this template yet.', 'error'); return }
+      try {
+        const a = Object.assign(document.createElement('a'), { href: svg, download: `datylon-template-${id.slice(0, 8)}.svg` })
+        a.click()
+        _markDatlylonDownloaded(id)
+        const card = overlay.querySelector(`.graph-card[data-id="${id}"]`)
+        if (card) {
+          const tmp = document.createElement('div')
+          tmp.innerHTML = _cardHTML(GRAPH_TEMPLATES.find(t => t.id === id))
+          const newCard = tmp.firstElementChild
+          card.replaceWith(newCard)
+          newCard.querySelectorAll('.graph-btn--download').forEach(b => bindDownloadBtn(b))
+        }
+        showToast('Template downloaded — upload it to Datylon via Workspace → Templates → Upload template.', 'success')
+      } catch { showToast('Download failed — try again.', 'error') }
+    })
+  }
+  overlay.querySelectorAll('.graph-btn--download').forEach(bindDownloadBtn)
 }
 
 // ── Blog thumbnail form ───────────────────────────────────────────────────────

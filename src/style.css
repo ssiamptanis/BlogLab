@@ -5144,3 +5144,169 @@ select.blog-form-input option {
 .mobile-editor-nav    { display: none; }
 /* Toolbar has no visible content on desktop — collapse it */
 .dash-toolbar         { display: none; }
+
+/* ── Graph template gallery ──────────────────────────────────────────────── */
+.graph-gallery-modal {
+  width: 860px;
+  max-width: 94vw;
+}
+.graph-gallery-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.55);
+  line-height: 1.5;
+  flex-shrink: 0;
+}
+.graph-gallery-info svg { flex-shrink: 0; margin-top: 1px; opacity: 0.6; }
+.graph-info-link { color: #FF0077; text-decoration: none; }
+.graph-info-link:hover { text-decoration: underline; }
+.graph-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+}
+.graph-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.15s;
+}
+.graph-card:hover { border-color: rgba(255,255,255,0.22); }
+.graph-card-preview {
+  width: 100%;
+  aspect-ratio: 16/9;
+  object-fit: cover;
+  display: block;
+}
+.graph-card-preview--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.04);
+}
+.graph-card-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.graph-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.graph-card-type {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.35);
+}
+.graph-card-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 99px;
+}
+.graph-card-badge--done {
+  background: rgba(0,255,136,0.12);
+  color: #00FF88;
+}
+.graph-card-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  line-height: 1.3;
+}
+.graph-card-desc {
+  font-size: 12px;
+  color: rgba(255,255,255,0.45);
+  line-height: 1.5;
+  flex: 1;
+}
+.graph-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.graph-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 14px;
+  border-radius: 7px;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s, background 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.graph-btn--primary {
+  background: #00FF88;
+  color: #000000;
+}
+.graph-btn--primary:hover { opacity: 0.88; }
+.graph-btn--ghost {
+  background: transparent;
+  color: rgba(255,255,255,0.55);
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.graph-btn--ghost:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.85);
+}
+
+/* ── Graph series toggle ─────────────────────────────────────────────────── */
+.graph-series-toggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 20px;
+}
+.graph-series-btn {
+  padding: 7px 16px;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+.graph-series-btn:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.75);
+}
+.graph-series-btn.active {
+  background: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+.graph-gallery-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: rgba(255,255,255,0.3);
+  font-size: 14px;
+  padding: 40px 0;
+}

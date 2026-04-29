@@ -1,0 +1,25 @@
+<svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="180" fill="#111111"/>
+  <text x="16" y="22" font-family="system-ui,sans-serif" font-size="10" font-weight="600" fill="rgba(255,255,255,0.35)" letter-spacing="1.5">BAR CHART</text>
+  <!-- Grid lines -->
+  <line x1="40" y1="30" x2="300" y2="30" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="60" x2="300" y2="60" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="90" x2="300" y2="90" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <line x1="40" y1="120" x2="300" y2="120" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+  <!-- Bars -->
+  <rect x="52"  y="55"  width="28" height="75" rx="2" fill="#FF0077" opacity="0.9"/>
+  <rect x="96"  y="40"  width="28" height="90" rx="2" fill="rgba(255,255,255,0.7)"/>
+  <rect x="140" y="70"  width="28" height="60" rx="2" fill="#FF0077" opacity="0.6"/>
+  <rect x="184" y="45"  width="28" height="85" rx="2" fill="rgba(255,255,255,0.7)"/>
+  <rect x="228" y="35"  width="28" height="95" rx="2" fill="#FF0077" opacity="0.9"/>
+  <!-- Baseline -->
+  <line x1="40" y1="130" x2="300" y2="130" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
+  <!-- X labels -->
+  <text x="66"  y="144" font-family="system-ui,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Q1</text>
+  <text x="110" y="144" font-family="system-ui,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Q2</text>
+  <text x="154" y="144" font-family="system-ui,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Q3</text>
+  <text x="198" y="144" font-family="system-ui,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Q4</text>
+  <text x="242" y="144" font-family="system-ui,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Q5</text>
+  <!-- Pink bottom accent -->
+  <rect x="0" y="170" width="320" height="3" fill="#FF0077"/>
+</svg>
