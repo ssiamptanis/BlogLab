@@ -1137,13 +1137,13 @@ function showThumbnailResult(blogMeta, imageDataUrl, csvRows = null, currentInde
         <button class="blog-form-cancel" id="thumb-result-back">${lucideSVG('arrow-left', 14, 'currentColor')} Choose different</button>
         <div style="display:flex;gap:10px">
           <button class="blog-form-submit" id="thumb-result-save" style="background:#2a7a4b">
-            ${lucideSVG('bookmark', 14, 'currentColor')} Save to dashboard
+            ${lucideSVG('bookmark', 14, 'currentColor')} Save
           </button>
           <button class="blog-form-submit" id="thumb-result-download">
-            ${lucideSVG('download', 14, 'currentColor')} Download PNG
+            ${lucideSVG('download', 14, 'currentColor')} Download
           </button>
-          ${hasNext ? `<button class="blog-form-submit" id="thumb-result-next" style="background:#1E3A5F">
-            Next thumbnail ${lucideSVG('arrow-right', 14, 'currentColor')}
+          ${hasNext ? `<button class="blog-form-submit" id="thumb-result-next" style="background:#ffffff;color:#000000;border-color:#ffffff">
+            Next ${lucideSVG('arrow-right', 14, '#000000')}
           </button>` : ''}
         </div>
       </div>
