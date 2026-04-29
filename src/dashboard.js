@@ -753,11 +753,15 @@ function normalizeCategory(raw) {
 }
 
 function parseCSV(text) {
-  // Tokenise properly — handle quoted fields that may contain commas
-  // (but we do NOT support newlines inside quoted fields; use | for multiple subtitles)
-  const lines = text.trim().split(/\r?\n/)
-  if (lines.length < 2) return []
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''))
+  // Strip BOM if present, split into physical lines
+  const raw = text.replace(/^﻿/, '').trim()
+  const allLines = raw.split(/\r?\n/)
+
+  // Skip blank lines and comment lines (#) to find the actual header row
+  const usableLines = allLines.filter(l => l.trim() && !l.trim().startsWith('#'))
+  if (usableLines.length < 2) return []
+
+  const headers = usableLines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, ''))
   const col = key => headers.findIndex(h => h.includes(key))
   const iTitle    = col('title')
   const iMeta     = col('meta')
@@ -776,23 +780,20 @@ function parseCSV(text) {
     return fields
   }
 
-  return lines.slice(1)
-    .filter(l => l.trim() && !l.trim().startsWith('#'))  // skip blank + comment lines
-    .map(line => {
-      const fields = splitLine(line)
-      // Subtitles: pipe-separated in the CSV ("Sub one|Sub two") → newline-joined for the textarea
-      const rawSubs = iSubs >= 0 ? (fields[iSubs] || '') : ''
-      const subtitles = rawSubs.includes('|')
-        ? rawSubs.split('|').map(s => s.trim()).join('\n')
-        : rawSubs
-      return {
-        title:     iTitle    >= 0 ? (fields[iTitle]    || '') : '',
-        metaDesc:  iMeta     >= 0 ? (fields[iMeta]     || '') : '',
-        subtitles,
-        category:  normalizeCategory(iCategory >= 0 ? (fields[iCategory] || '') : ''),
-      }
-    })
-    .filter(r => r.title)
+  return usableLines.slice(1).map(line => {
+    const fields = splitLine(line)
+    // Subtitles: pipe-separated ("Sub one|Sub two") → newline-joined for the textarea
+    const rawSubs = iSubs >= 0 ? (fields[iSubs] || '') : ''
+    const subtitles = rawSubs.includes('|')
+      ? rawSubs.split('|').map(s => s.trim()).join('\n')
+      : rawSubs
+    return {
+      title:     iTitle    >= 0 ? (fields[iTitle]    || '') : '',
+      metaDesc:  iMeta     >= 0 ? (fields[iMeta]     || '') : '',
+      subtitles,
+      category:  normalizeCategory(iCategory >= 0 ? (fields[iCategory] || '') : ''),
+    }
+  }).filter(r => r.title)
 }
 
 // ── Blog thumbnail form ───────────────────────────────────────────────────────
@@ -917,14 +918,15 @@ function showBlogThumbnailForm(csvRows = null, currentIndex = 0) {
   // CSV template download
   overlay.querySelector('#blog-csv-download')?.addEventListener('click', e => {
     e.preventDefault()
-    const lines = [
-      '# Valid categories: Audiences | Consumer behaviour | Digital trends | Data journalism | Talk data to me | Product | Strategy',
-      '# For multiple subtitles in one cell, separate them with a pipe character: Subtitle one|Subtitle two',
+    // IMPORTANT: no embedded newlines in any field — use | to separate multiple subtitles
+    // Valid categories: Audiences | Consumer behaviour | Digital trends | Data journalism | Talk data to me | Product | Strategy
+    const rows = [
       'title,meta_description,subtitles,category',
-      '"The state of social media in 2025","A look at how audiences are engaging with social platforms this year","Why TikTok still leads|The rise of video content","Digital trends"',
-      '"Understanding consumer behaviour","How spending habits are shifting across global markets","","Consumer behaviour"',
+      '"The state of social media in 2025","How audiences across markets are engaging with social platforms this year","Why TikTok still leads|The rise of short-form video","Digital trends"',
+      '"Understanding Gen Z spending habits","How the youngest consumers are reshaping global markets","Key spending shifts|Brand loyalty trends","Audiences"',
+      '"Q3 2025 platform insights","A breakdown of platform performance across regions","","Strategy"',
     ]
-    const csv = lines.join('\n')
+    const csv = rows.join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'thumbnail-template.csv' })
     a.click()
