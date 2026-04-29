@@ -43,15 +43,44 @@ function _esc(s) {
 
 function _getSessionAvatar() {
   try {
-    // Supabase stores session under sb-{project_ref}-auth-token
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
+    // Supabase stores session under sb-{project_ref}-auth-token (v2) or supabase.auth.token (v1)
+    const keys = Object.keys(localStorage).filter(k =>
+      (k.startsWith('sb-') && k.endsWith('-auth-token')) || k === 'supabase.auth.token'
+    )
     for (const k of keys) {
       const s = JSON.parse(localStorage.getItem(k) || '{}')
-      const meta = s?.user?.user_metadata || s?.session?.user?.user_metadata
-      if (meta?.avatar_url) return { avatar: meta.avatar_url, name: meta.full_name || meta.name || '' }
+      // v2 stores directly; v1 wraps in currentSession
+      const user = s?.user || s?.currentSession?.user
+      const meta = user?.user_metadata || s?.session?.user?.user_metadata
+      if (meta) {
+        const avatar = meta.avatar_url || meta.picture || ''
+        const name   = meta.full_name  || meta.name   || user?.email || ''
+        if (avatar) return { avatar, name }
+      }
     }
   } catch {}
   return { avatar: '', name: '' }
+}
+
+// ── Patch avatar after async session load ────────────────────────────────────
+export function patchTitlebarUser(root, { name = '', avatarUrl = '' } = {}) {
+  const btn = root?.querySelector('#tb-user-btn')
+  if (!btn) return
+  const nameEl = btn.querySelector('.tb-user-name')
+  if (nameEl && name) nameEl.textContent = name.split(' ')[0]
+  if (!avatarUrl) return
+  const existing = btn.querySelector('.tb-avatar')
+  if (!existing) return
+  if (existing.tagName === 'IMG') {
+    existing.src = avatarUrl   // already an img, just update src
+  } else {
+    // Replace placeholder div with real img
+    const img = document.createElement('img')
+    img.className = 'tb-avatar'
+    img.src = avatarUrl
+    img.alt = name || ''
+    existing.replaceWith(img)
+  }
 }
 
 // ── HTML ─────────────────────────────────────────────────────────────────────

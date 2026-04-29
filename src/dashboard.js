@@ -1,5 +1,5 @@
 // ABX PDF Builder — Dashboard view
-import { titlebarHTML, bindTitlebarEvents, syncTabs, updateTabName } from './titlebar.js'
+import { titlebarHTML, bindTitlebarEvents, syncTabs, updateTabName, patchTitlebarUser } from './titlebar.js'
 import { lucideSVG } from './lucide-icons.js'
 import { BRAND } from './brand.js'
 const ILLUS_PREFS_KEY    = 'abx_illus_enabled_nodes'
@@ -284,6 +284,8 @@ function renderDashboardHTML() {
   bindTitlebarEvents(_root, { navigate: _navigate })
   bindEvents()
   _bindMobileDashNav()
+  // Patch avatar asynchronously — localStorage read may have missed it on first render
+  _getDashUser().then(u => patchTitlebarUser(_root, u))
 }
 
 function _bindMobileDashNav() {
