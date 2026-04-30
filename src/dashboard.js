@@ -1640,11 +1640,13 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
   let offsetX   = 0
   let offsetY   = 0
 
-  // Default: contain the full image within the canvas (no cropping).
-  // base uses Math.min so the whole image is visible at scale=1.
-  // The user zooms in (scale > 1) to fill the frame before hitting "Use this".
+  // Default positioning:
+  //   Portrait images  → scale to fill the canvas width (no side bars), may overflow top/bottom
+  //   Landscape images → contain the full image (no cropping), user zooms in as needed
+  // The user then pans and zooms before hitting "Use this".
   function calcDraw(imgW, imgH, scale, ox, oy) {
-    const base = Math.min(W / imgW, H / imgH) * scale
+    const isPortrait = imgH > imgW
+    const base = (isPortrait ? W / imgW : Math.min(W / imgW, H / imgH)) * scale
     const dw   = imgW * base
     const dh   = imgH * base
     const bx   = (W - dw) / 2

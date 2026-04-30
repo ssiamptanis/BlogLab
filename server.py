@@ -1365,9 +1365,11 @@ def _compose_image(image_url, width=1200, height=700, user_scale=1.0, offset_x=0
     img = Image.open(io.BytesIO(res.content)).convert('RGB')
 
     src_w, src_h = img.size
+    is_portrait  = src_h > src_w
 
-    # Contain: scale so the full image fits within the canvas (Math.min equivalent)
-    base_scale = min(width / src_w, height / src_h) * user_scale
+    # Portrait → scale to fill canvas width (no side bars); landscape → contain full image.
+    # Matches the client-side calcDraw logic exactly.
+    base_scale = (width / src_w if is_portrait else min(width / src_w, height / src_h)) * user_scale
     draw_w     = max(1, int(src_w * base_scale))
     draw_h     = max(1, int(src_h * base_scale))
 
