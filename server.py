@@ -1,5 +1,5 @@
 """
-ABX PDF Builder — Flask backend
+GWI Blog Thumbnail Creator — Flask backend
 Supabase-backed: templates, folders, and image uploads stored in Supabase.
 Auth: Supabase JWT validated on every /api/ route.
 """
@@ -21,11 +21,6 @@ from flask_cors import CORS
 
 from dotenv import load_dotenv
 load_dotenv()
-
-# ── Imports ───────────────────────────────────────────────────────────────────
-
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from builder import PDFBuilder
 
 # ── Flask app ─────────────────────────────────────────────────────────────────
 
@@ -876,136 +871,6 @@ def figma_svg_debug():
     })
 
 
-# ── PDF generation ────────────────────────────────────────────────────────────
-
-from builder import rich_to_rl   # noqa: E402 — imported after sys.path setup
-
-@app.route("/api/generate", methods=["POST"])
-@require_auth
-def generate():
-    data     = request.get_json(force=True)
-    blocks   = data.get("blocks", [])
-    filename = data.get("filename", "untitled.pdf") or "untitled.pdf"
-    if not filename.endswith(".pdf"):
-        filename += ".pdf"
-
-    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-        tmp_path = tmp.name
-
-    try:
-        pdf = PDFBuilder(
-            tmp_path,
-            doc_title=data.get("docTitle", ""),
-            doc_author=data.get("docAuthor", ""),
-        )
-
-        for block in blocks:
-            btype       = block.get("type", "")
-            use_card    = block.get("card", False)
-            card_border = block.get("card_border", "")
-            card_bg     = block.get("card_bg", "#FFFFFF")
-
-            card_types = ("cover", "section-page", "page-break", "footer")
-            if use_card and btype not in card_types:
-                pdf.begin_card(border_color=card_border, bg_color=card_bg)
-
-            if btype == "cover":
-                pdf.cover(title=block.get("title",""), subtitle=block.get("subtitle",""),
-                          author=block.get("author",""), date=block.get("date",""),
-                          category=block.get("category",""))
-            elif btype == "section-page":
-                pdf.section_page(title=block.get("title",""), description=block.get("description",""))
-            elif btype in ("h1","h2","h3","h4"):
-                pdf.section(block.get("text",""), level=int(btype[1]))
-            elif btype == "body":
-                pdf.body(block.get("text",""), muted=block.get("muted", False))
-            elif btype == "small":
-                pdf.small(block.get("text",""))
-            elif btype == "bullets":
-                pdf.bullets(block.get("items", []))
-            elif btype == "numbered":
-                pdf.numbered(block.get("items", []))
-            elif btype == "stats":
-                pdf.stats(items=block.get("items",[]), columns=int(block.get("columns",1)),
-                          section_num=block.get("section_num",""), section_title=block.get("section_title",""),
-                          body=block.get("body",""))
-            elif btype == "stat-cards":
-                pdf.stat_cards(left=block.get("left",{}), right=block.get("right",{}))
-            elif btype == "table":
-                pdf.table(headers=block.get("headers",[]), rows=block.get("rows",[]),
-                          caption=block.get("caption",""))
-            elif btype == "callout":
-                pdf.callout(block.get("text",""), style=block.get("style","brand"))
-            elif btype == "two-columns":
-                pdf.two_columns(left=rich_to_rl(block.get("left","")),
-                                right=rich_to_rl(block.get("right","")))
-            elif btype == "divider":
-                pdf.divider(thick=block.get("thick", False))
-            elif btype == "infographic-hero":
-                pdf.infographic_hero(accent=block.get("accent",""), title=block.get("title",""),
-                                     image=block.get("image",""), image_scale=float(block.get("image_scale",1.0)))
-            elif btype == "ig-stats":
-                pdf.ig_stats(columns=int(block.get("columns",3)), items=block.get("items",[]))
-            elif btype == "abx-header":
-                pdf.abx_header(title=block.get("title",""), descriptor=block.get("descriptor",""),
-                               image=block.get("image",""), image_scale=float(block.get("image_scale",1.0)))
-            elif btype == "page-break":
-                pdf.page_break()
-            elif btype == "footer":
-                pdf.footer(text=block.get("text",""), button_label=block.get("button_label","Discover more"),
-                           button_url=block.get("button_url",""))
-
-            if use_card and btype not in card_types:
-                pdf.end_card()
-
-            if btype == "page-break":   pass
-            elif btype == "footer":     pdf.space(20)
-            else:                       pdf.space(40)
-
-        pdf.build()
-
-        return send_file(tmp_path, mimetype="application/pdf",
-                         as_attachment=True, download_name=filename)
-
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": str(e), "traceback": traceback.format_exc()}), 500
-
-    finally:
-        try: os.unlink(tmp_path)
-        except Exception: pass
-        # Clean up any temp image files downloaded during build
-        import builder as _builder_mod
-        for _f in list(_builder_mod._tmp_image_files):
-            try: os.unlink(_f)
-            except Exception: pass
-        _builder_mod._tmp_image_files.clear()
-
-
-# ── Spark generation ──────────────────────────────────────────────────────────
-
-@app.route("/api/spark-generate", methods=["POST"])
-@require_auth
-def spark_generate():
-    data          = request.get_json(force=True)
-    audience      = (data.get("audience")      or "").strip()
-    topic         = (data.get("topic")         or "").strip()
-    template_type = (data.get("template_type") or "insight-report").strip()
-    if not audience or not topic:
-        return jsonify({"error": "audience and topic are required"}), 400
-    try:
-        from spark_gwi import generate_blocks
-        blocks = generate_blocks(audience, topic, template_type)
-        return jsonify({"blocks": blocks})
-    except ImportError as e:
-        return jsonify({"error": f"spark_gwi module unavailable: {e}"}), 500
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 422
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": f"Generation failed: {e}"}), 500
-
-
 # ── Feedback ──────────────────────────────────────────────────────────────────
 
 @app.route("/api/feedback", methods=["GET"])
@@ -1821,5 +1686,5 @@ def generate_talkdata_thumbnail():
 if __name__ == "__main__":
     # Railway sets PORT; fallback to FLASK_PORT for local dev
     port = int(os.environ.get("PORT", os.environ.get("FLASK_PORT", 5001)))
-    print(f"ABX PDF Builder server — http://localhost:{port}")
+    print(f"GWI Blog Thumbnail Creator — http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

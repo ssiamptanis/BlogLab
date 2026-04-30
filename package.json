@@ -1,7 +1,7 @@
 {
-  "name": "abx-pdf-builder",
+  "name": "gwi-blog-thumbnail-creator",
   "version": "1.0.0",
-  "description": "ABX PDF Builder — GWI branded report generator",
+  "description": "GWI Blog Thumbnail Creator",
   "author": "Built by: Darragh O'Hagan",
   "type": "module",
   "scripts": {
