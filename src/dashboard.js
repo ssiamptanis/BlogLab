@@ -220,8 +220,33 @@ function gridHTML() {
     </div>`
   }
 
-  // Real cards — background refresh happens silently with no extra ghost cells
-  return `<div class="dash-grid">${list.map(cardHTML).join('')}</div>`
+  // Group cards by month/year based on updated_at
+  const groups = []
+  const seen = new Map()
+  for (const t of list) {
+    const d = t.updated_at ? new Date(t.updated_at) : null
+    const key = d
+      ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      : 'undated'
+    const label = d
+      ? d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+      : 'Undated'
+    if (!seen.has(key)) {
+      seen.set(key, groups.length)
+      groups.push({ key, label, items: [] })
+    }
+    groups[seen.get(key)].items.push(t)
+  }
+
+  return groups.map((g, i) => `
+    <div class="dash-month-group">
+      <div class="dash-month-divider ${i === 0 ? 'dash-month-divider--first' : ''}">
+        <span class="dash-month-label">${g.label}</span>
+        <span class="dash-month-line"></span>
+      </div>
+      <div class="dash-grid">${g.items.map(cardHTML).join('')}</div>
+    </div>
+  `).join('')
 }
 
 function sidebarFoldersHTML() {
@@ -1615,14 +1640,15 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
   let offsetX   = 0
   let offsetY   = 0
 
-  // Replicate server _compose_image default positioning so preview matches output
+  // Default: contain the full image within the canvas (no cropping).
+  // base uses Math.min so the whole image is visible at scale=1.
+  // The user zooms in (scale > 1) to fill the frame before hitting "Use this".
   function calcDraw(imgW, imgH, scale, ox, oy) {
-    const isPortrait = imgH > imgW
-    const base = Math.max(W / imgW, H / imgH) * scale
+    const base = Math.min(W / imgW, H / imgH) * scale
     const dw   = imgW * base
     const dh   = imgH * base
     const bx   = (W - dw) / 2
-    const by   = isPortrait ? 0 : (H - dh) / 2
+    const by   = (H - dh) / 2
     return { x: bx + ox, y: by + oy, w: dw, h: dh }
   }
 
@@ -1684,13 +1710,14 @@ function showImageAdjust(blogMeta, imageUrl, csvRows, currentIndex, result, atte
         <div id="iadj-loading" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:-8px"><span class="page-spinner" style="width:16px;height:16px;border-width:2px"></span><span style="font-size:13px;color:var(--text-secondary)">Loading image…</span></div>
 
         <div style="max-width:420px;margin:0 auto;width:100%">
-          <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px;color:#fff">Image adjustments</p>
-          <label class="blog-form-label">Scale — <span id="iadj-scale-val">100%</span></label>
-          <input type="range" class="iadj-slider" id="iadj-scale" min="80" max="300" value="100">
+          <p style="font-weight:700;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px;color:#fff">Image adjustments</p>
+          <p style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:14px">The full image is shown. Zoom in and pan to frame your shot, then click <strong style="color:rgba(255,255,255,0.65)">Use this</strong>.</p>
+          <label class="blog-form-label">Zoom — <span id="iadj-scale-val">100%</span></label>
+          <input type="range" class="iadj-slider" id="iadj-scale" min="100" max="500" value="100">
           <label class="blog-form-label">Left / Right — <span id="iadj-x-val">0</span></label>
-          <input type="range" class="iadj-slider" id="iadj-x" min="-600" max="600" value="0">
+          <input type="range" class="iadj-slider" id="iadj-x" min="-800" max="800" value="0">
           <label class="blog-form-label">Up / Down — <span id="iadj-y-val">0</span></label>
-          <input type="range" class="iadj-slider" id="iadj-y" min="-600" max="600" value="0">
+          <input type="range" class="iadj-slider" id="iadj-y" min="-800" max="800" value="0">
         </div>
 
         <div id="iadj-error" class="blog-form-error" style="display:none"></div>

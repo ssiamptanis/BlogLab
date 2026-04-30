@@ -1089,21 +1089,24 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
             import json as _json
             angle_hint = _VISUAL_ANGLES[attempt % len(_VISUAL_ANGLES)]
             prompt = (
-                f"You are helping select a stock photo for a blog thumbnail (attempt {attempt + 1}).\n"
-                f"Blog title: {title}\nCategory: {category}\n"
-                f"Meta description: {meta_desc or 'N/A'}\n\n"
-                f"Return a JSON object with one key 'query' containing 5-8 keywords "
-                f"for a Pexels image search. The image MUST be a real photograph — "
-                f"absolutely no illustrations, vectors, digital art, 3D renders, clipart, "
-                f"drawings, or artwork of any kind. Real photography only. "
-                f"The image MUST be simple and minimal — "
-                f"plain or solid-colour background, uncluttered composition, clean layout. "
-                f"Focus on the OVERALL THEME of the title and category, not individual subtitles. "
-                f"Do NOT include words like 'illustration', 'vector', 'flat', 'icon', 'drawing', "
-                f"'clipart', '3d', 'render', or 'art' in the query. "
-                f"Make this attempt visually distinct "
+                f"You are selecting a stock photo for a GWI blog thumbnail (attempt {attempt + 1}).\n"
+                f"Blog title: {title}\n"
+                f"Category: {category}\n"
+                f"Meta description: {meta_desc or 'N/A'}\n"
+                f"Subtitles / key points: {subtitles or 'N/A'}\n\n"
+                f"Your job: return a JSON object with ONE key 'query' containing 4-6 keywords "
+                f"for a Pexels stock photo search. Rules:\n"
+                f"1. Think about what VISUAL best represents the blog's core theme — not a literal "
+                f"illustration of the title words, but the FEELING or CONTEXT the reader should get.\n"
+                f"2. The photo MUST be a real photograph. No illustrations, vectors, 3D renders, "
+                f"digital art, clipart, drawings, or cartoons.\n"
+                f"3. Keep the composition minimal — plain or solid-colour background, clean and "
+                f"uncluttered. Avoid busy scenes.\n"
+                f"4. Do NOT include the words 'illustration', 'vector', 'flat', 'icon', 'drawing', "
+                f"'clipart', '3d', 'render', 'art', or 'graphic' in the query.\n"
+                f"5. Each retry should feel visually distinct from previous attempts "
                 f"{'(' + angle_hint + ')' if angle_hint else ''}.\n"
-                f"Example: {{\"query\": \"person using laptop coffee shop natural light\"}}"
+                f"Respond with ONLY valid JSON, e.g. {{\"query\": \"professional woman laptop office natural light\"}}"
             )
             res = _requests.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}",
@@ -1122,7 +1125,8 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
     # ── Fallback keyword extraction ───────────────────────────────────────────
     stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
                   'of', 'with', 'by', 'from', 'is', 'are', 'was', 'be', 'this', 'that',
-                  'how', 'why', 'what', 'its', 'it', 'as', 'into', 'state', 'data', 'new'}
+                  'how', 'why', 'what', 'its', 'it', 'as', 'into', 'state', 'data', 'new',
+                  'your', 'our', 'their', 'which', 'about', 'more', 'most', 'some', 'these'}
 
     def extract(text, max_words):
         words = []
@@ -1137,6 +1141,9 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
     # Title: up to 3 words (primary subject signal)
     title_words = extract(title, 3)
 
+    # Meta description: up to 2 words (adds topical depth the title alone misses)
+    meta_words = extract(meta_desc or '', 2) if attempt == 0 else []
+
     # Category visual terms: pick 2, rotated per attempt
     cat_terms = list(_CATEGORY_VISUAL_TERMS.get(category, ['minimal', 'clean', category]))
     rng.shuffle(cat_terms)
@@ -1146,13 +1153,10 @@ def _build_search_query(title, meta_desc, subtitles, category, attempt=0):
     angle = _VISUAL_ANGLES[attempt % len(_VISUAL_ANGLES)]
     angle_words = angle.split() if angle else []
 
-    # Subtitles: at most 1 word, only on first attempt
-    sub_words = extract(subtitles or '', 1) if attempt == 0 else []
-
     # Always append global aesthetic modifiers (deduplicated below)
     aesthetic_words = _GLOBAL_AESTHETIC.split()
 
-    combined = title_words + cat_words + sub_words + angle_words + aesthetic_words
+    combined = title_words + meta_words + cat_words + angle_words + aesthetic_words
     seen = set()
     unique = [w for w in combined if not (w in seen or seen.add(w))]
     return ' '.join(unique[:10])
@@ -1350,31 +1354,28 @@ def _get_figma_frames(page_name, count=3, exclude_ids=None):
 
 
 def _compose_image(image_url, width=1200, height=700, user_scale=1.0, offset_x=0, offset_y=0):
-    """Download image, scale to cover width×height, apply user pan/zoom, return base64 PNG.
+    """Download image, place it on a width×height canvas matching the client preview.
 
-    Default (user_scale=1.0, offset_x/y=0) reproduces the old auto-crop behaviour:
-      - Portrait: scale to fill width, anchor top (head at top of frame)
-      - Landscape wider than target: scale to fill height, centre horizontally
-      - Square / landscape narrower: scale to fill width, centre vertically
-    User controls override these defaults via scale multiplier and pixel offsets.
+    Default (user_scale=1.0, offset_x/y=0): contain the full image centred on a
+    black canvas — no cropping — matching what the adjust screen shows the user.
+    The user zooms in (user_scale > 1) and pans (offset_x/y) to compose their shot.
     """
     res = _requests.get(image_url, timeout=20)
     res.raise_for_status()
     img = Image.open(io.BytesIO(res.content)).convert('RGB')
 
     src_w, src_h = img.size
-    is_portrait  = src_h > src_w
 
-    # Scale so image covers the canvas, then apply user multiplier
-    base_scale = max(width / src_w, height / src_h) * user_scale
+    # Contain: scale so the full image fits within the canvas (Math.min equivalent)
+    base_scale = min(width / src_w, height / src_h) * user_scale
     draw_w     = max(1, int(src_w * base_scale))
     draw_h     = max(1, int(src_h * base_scale))
 
     img_resized = img.resize((draw_w, draw_h), Image.LANCZOS)
 
-    # Default anchor: portrait → top-centre; landscape → centre
+    # Always centre, then apply user offsets
     base_x = (width  - draw_w) // 2
-    base_y = 0 if is_portrait else (height - draw_h) // 2
+    base_y = (height - draw_h) // 2
 
     draw_x = base_x + offset_x
     draw_y = base_y + offset_y
