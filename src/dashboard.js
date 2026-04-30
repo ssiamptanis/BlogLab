@@ -154,7 +154,8 @@ function dashFilterBarHTML() {
   const months     = _availableMonths()
   const categories = _availableCategories()
   const creators   = _availableCreators()
-  const hasActive  = _filterMonth || _filterCategory || _filterCreator
+  const showCreator = _filter === 'all'
+  const hasActive  = _filterMonth || _filterCategory || (showCreator && _filterCreator)
 
   return `
     <div class="dash-filter-bar">
@@ -167,10 +168,11 @@ function dashFilterBarHTML() {
         <option value="">Category</option>
         ${categories.map(c => `<option value="${c}" ${_filterCategory === c ? 'selected' : ''}>${c.replace(/\b\w/g, l => l.toUpperCase())}</option>`).join('')}
       </select>
+      ${showCreator ? `
       <select class="dash-filter-select ${_filterCreator ? 'dash-filter-select--active' : ''}" id="df-creator">
         <option value="">Creator</option>
         ${creators.map(a => `<option value="${a}" ${_filterCreator === a ? 'selected' : ''}>${a}</option>`).join('')}
-      </select>
+      </select>` : ''}
       ${hasActive ? `<button class="dash-filter-clear" id="df-clear">Clear filters</button>` : ''}
     </div>
   `
@@ -2996,11 +2998,14 @@ function bindEvents() {
       _filter = btn.dataset.filter
       // Switching top-level filter always clears the active folder
       _activeFolderId = null
+      // Clear creator filter when leaving "Files across GWI"
+      if (_filter !== 'all') _filterCreator = ''
       _root.querySelectorAll('.dash-filter-btn[data-filter]').forEach(b =>
         b.classList.toggle('active', b.dataset.filter === _filter))
       // Reset folder sidebar active state to "All folders"
       _root.querySelectorAll('[data-folder-id]').forEach(b => b.classList.remove('active'))
       _root.querySelector('.dash-filter-btn[data-folder-id=""]')?.classList.add('active')
+      _refreshFilterBar()
       refreshGrid()
     })
   })
