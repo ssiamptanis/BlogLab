@@ -4633,8 +4633,8 @@ select.blog-form-input option {
   justify-content: center;
 }
 .del-folder-modal {
-  background: #1E2736;
-  border: 1px solid #2E3A4E;
+  background: #111111;
+  border: 1px solid rgba(255,255,255,0.1);
   border-radius: 12px;
   padding: 32px 28px 24px;
   width: 380px;
