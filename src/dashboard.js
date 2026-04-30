@@ -1062,7 +1062,7 @@ function showGraphTemplates() {
         <button class="tmpl-picker-close" id="graph-gallery-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
       <div class="graph-gallery-info">
-        ${lucideSVG('info', 13, 'currentColor')}
+        ${lucideSVG('info', 16, 'currentColor')}
         <span>You need a free <a href="https://www.datylon.com/" target="_blank" rel="noopener" class="graph-info-link">Datylon account</a> to edit templates. First time? Download the SVG and upload it via <strong>Workspace → Templates → Upload template</strong> in Datylon.</span>
       </div>
       <div class="graph-series-toggle">

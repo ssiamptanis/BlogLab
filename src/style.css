@@ -5153,20 +5153,20 @@ select.blog-form-input option {
 .graph-gallery-info {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 8px;
-  padding: 12px 14px;
+  gap: 12px;
+  background: rgba(255, 0, 119, 0.08);
+  border: 1px solid rgba(255, 0, 119, 0.35);
+  border-radius: 10px;
+  padding: 16px 18px;
   margin-bottom: 24px;
-  font-size: 13px;
-  color: rgba(255,255,255,0.55);
-  line-height: 1.5;
+  font-size: 14px;
+  color: rgba(255,255,255,0.8);
+  line-height: 1.6;
   flex-shrink: 0;
 }
-.graph-gallery-info svg { flex-shrink: 0; margin-top: 1px; opacity: 0.6; }
-.graph-info-link { color: #FF0077; text-decoration: none; }
-.graph-info-link:hover { text-decoration: underline; }
+.graph-gallery-info svg { flex-shrink: 0; margin-top: 2px; color: #FF0077; opacity: 1; }
+.graph-info-link { color: #FF0077; text-decoration: underline; text-underline-offset: 2px; }
+.graph-info-link:hover { color: #ff3399; }
 .graph-gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
