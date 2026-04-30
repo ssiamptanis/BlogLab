@@ -5202,8 +5202,6 @@ select.blog-form-input option {
 .dash-mob-menu-btn    { display: none; }
 .dash-mob-create-btn  { display: none; }
 .mobile-editor-nav    { display: none; }
-/* Toolbar has no visible content on desktop — collapse it */
-.dash-toolbar         { display: none; }
 
 /* ── Graph template gallery ──────────────────────────────────────────────── */
 .graph-gallery-modal {
