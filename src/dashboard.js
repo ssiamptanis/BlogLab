@@ -22,6 +22,11 @@ let _activeFolderId = null   // null = show all folders
 let _showSettings = false    // settings panel open
 let _globalEventsRegistered = false
 
+// Dashboard filters
+let _filterMonth    = ''   // 'YYYY-MM' or ''
+let _filterCategory = ''   // category string or ''
+let _filterCreator  = ''   // author name or ''
+
 // Cache — persists across navigations so returning home is instant
 let _dataLoaded  = false
 let _refreshing  = false   // true while background loadData() is in flight
@@ -102,8 +107,72 @@ function filteredTemplates() {
     if (_filter === 'draft' && t.status !== 'draft')   return false
     if (_activeFolderId && t.folder_id !== _activeFolderId) return false
 
+    // Toolbar filters
+    if (_filterMonth) {
+      const d = t.updated_at ? new Date(t.updated_at) : null
+      const key = d ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` : ''
+      if (key !== _filterMonth) return false
+    }
+    if (_filterCategory && (t.doc_category || '').toLowerCase() !== _filterCategory.toLowerCase()) return false
+    if (_filterCreator  && (t.doc_author   || '') !== _filterCreator) return false
+
     return true
   })
+}
+
+function _availableMonths() {
+  const seen = new Map()
+  for (const t of _templates) {
+    const d = t.updated_at ? new Date(t.updated_at) : null
+    if (!d) continue
+    const key   = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+    if (!seen.has(key)) seen.set(key, label)
+  }
+  return [...seen.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+}
+
+function _availableCategories() {
+  const seen = new Set()
+  for (const t of _templates) {
+    const c = (t.doc_category || '').trim()
+    if (c) seen.add(c)
+  }
+  return [...seen].sort()
+}
+
+function _availableCreators() {
+  const seen = new Set()
+  for (const t of _templates) {
+    const a = (t.doc_author || '').trim()
+    if (a) seen.add(a)
+  }
+  return [...seen].sort()
+}
+
+function dashFilterBarHTML() {
+  const months     = _availableMonths()
+  const categories = _availableCategories()
+  const creators   = _availableCreators()
+  const hasActive  = _filterMonth || _filterCategory || _filterCreator
+
+  return `
+    <div class="dash-filter-bar">
+      <select class="dash-filter-select ${_filterMonth ? 'dash-filter-select--active' : ''}" id="df-month">
+        <option value="">Month</option>
+        ${months.map(([k, l]) => `<option value="${k}" ${_filterMonth === k ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+      <select class="dash-filter-select ${_filterCategory ? 'dash-filter-select--active' : ''}" id="df-category">
+        <option value="">Category</option>
+        ${categories.map(c => `<option value="${c}" ${_filterCategory === c ? 'selected' : ''}>${c.replace(/\b\w/g, l => l.toUpperCase())}</option>`).join('')}
+      </select>
+      <select class="dash-filter-select ${_filterCreator ? 'dash-filter-select--active' : ''}" id="df-creator">
+        <option value="">Creator</option>
+        ${creators.map(a => `<option value="${a}" ${_filterCreator === a ? 'selected' : ''}>${a}</option>`).join('')}
+      </select>
+      ${hasActive ? `<button class="dash-filter-clear" id="df-clear">Clear filters</button>` : ''}
+    </div>
+  `
 }
 
 // ── Render ───────────────────────────────────────────────────────────────────
@@ -296,6 +365,7 @@ function renderDashboardHTML() {
             </button>
             <!-- Create button: mobile only (mirrors sidebar button) -->
             <button class="btn btn-primary dash-mob-create-btn" id="dash-mob-new">+ New</button>
+            ${!_showSettings ? dashFilterBarHTML() : ''}
           </div>
           <div id="dash-content">
             ${_showSettings ? settingsHTML() : gridHTML()}
@@ -2711,20 +2781,6 @@ function settingsHTML() {
           </div>
         </div>
 
-        <div class="settings-card" id="settings-illustrations-card">
-          <div class="settings-card-icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
-            </svg>
-          </div>
-          <div class="settings-card-body">
-            <div class="settings-card-title">Illustrations</div>
-            <div class="settings-card-desc">Choose which illustration libraries appear in the image picker.</div>
-          </div>
-          <div class="settings-card-arrow">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-          </div>
-        </div>
 
         <div class="settings-card" id="settings-signout-card">
           <div class="settings-card-icon">
@@ -2947,6 +3003,40 @@ function bindEvents() {
       refreshGrid()
     })
   })
+
+  // Toolbar dropdown filters
+  function _rebindFilterBar() {
+    _root.querySelector('#df-month')?.addEventListener('change', e => {
+      _filterMonth = e.target.value
+      _refreshFilterBar()
+      refreshGrid()
+    })
+    _root.querySelector('#df-category')?.addEventListener('change', e => {
+      _filterCategory = e.target.value
+      _refreshFilterBar()
+      refreshGrid()
+    })
+    _root.querySelector('#df-creator')?.addEventListener('change', e => {
+      _filterCreator = e.target.value
+      _refreshFilterBar()
+      refreshGrid()
+    })
+    _root.querySelector('#df-clear')?.addEventListener('click', () => {
+      _filterMonth = ''; _filterCategory = ''; _filterCreator = ''
+      _refreshFilterBar()
+      refreshGrid()
+    })
+  }
+  function _refreshFilterBar() {
+    const toolbar = _root.querySelector('.dash-toolbar')
+    if (!toolbar) return
+    toolbar.querySelector('.dash-filter-bar')?.remove()
+    const div = document.createElement('div')
+    div.innerHTML = dashFilterBarHTML()
+    while (div.firstChild) toolbar.appendChild(div.firstChild)
+    _rebindFilterBar()
+  }
+  _rebindFilterBar()
 
   // Folder filter buttons
   _root.querySelectorAll('[data-folder-id]').forEach(el => {

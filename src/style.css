@@ -3978,14 +3978,59 @@ select.blog-form-input option {
 }
 
 .dash-toolbar {
-  padding: 20px 24px 12px;
+  padding: 16px 24px;
   background: #F7FAFF;
   border-bottom: 1px solid rgba(0,0,0,0.07);
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
+
+/* ── Dashboard filter bar ──────────────────────────────────────── */
+.dash-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+.dash-filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  border: 1px solid #d0d7e3;
+  border-radius: 8px;
+  padding: 7px 30px 7px 12px;
+  font-size: 13px;
+  color: #444;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-width: 130px;
+}
+.dash-filter-select:hover { border-color: #a0aabb; }
+.dash-filter-select:focus { outline: none; border-color: #FF0077; box-shadow: 0 0 0 3px rgba(255,0,119,0.12); }
+.dash-filter-select--active {
+  border-color: #FF0077;
+  color: #FF0077;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23FF0077' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+.dash-filter-clear {
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #888;
+  cursor: pointer;
+  padding: 6px 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+.dash-filter-clear:hover { color: #FF0077; }
 
 
 /* Settings button — far right of toolbar */
@@ -4226,14 +4271,6 @@ select.blog-form-input option {
   flex-direction: column;
   justify-content: flex-start;
   gap: 0;
-}
-.tmpl-card-thumb::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.22);
-  pointer-events: none;
-  z-index: 2;
 }
 .tmpl-status-thumb,
 .tmpl-card-type-badge {
