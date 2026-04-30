@@ -158,6 +158,7 @@ function dashFilterBarHTML() {
 
   return `
     <div class="dash-filter-bar">
+      <span class="dash-filter-label">Filter by:</span>
       <select class="dash-filter-select ${_filterMonth ? 'dash-filter-select--active' : ''}" id="df-month">
         <option value="">Month</option>
         ${months.map(([k, l]) => `<option value="${k}" ${_filterMonth === k ? 'selected' : ''}>${l}</option>`).join('')}
@@ -342,8 +343,8 @@ function renderDashboardHTML() {
             <button class="btn btn-primary" id="dash-new" style="width:100%;justify-content:center;margin-bottom:12px;background:#00FF88;border-color:#00FF88;color:#000">+ Create new asset</button>
           </div>
           <div class="dash-sidebar-section">
-            <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">My files</button>
-            <button class="dash-filter-btn ${_filter === 'all'   ? 'active' : ''}" data-filter="all">Files across GWI</button>
+            <button class="dash-filter-btn ${_filter === 'mine'  ? 'active' : ''}" data-filter="mine">${lucideSVG('user', 14, 'currentColor')} My files</button>
+            <button class="dash-filter-btn ${_filter === 'all'   ? 'active' : ''}" data-filter="all">${lucideSVG('building-2', 14, 'currentColor')} Files across GWI</button>
           </div>
           <div class="dash-sidebar-section">
             <div class="dash-sidebar-label">Folders</div>

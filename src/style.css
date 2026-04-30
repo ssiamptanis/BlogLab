@@ -3146,7 +3146,9 @@ body, html { overflow-x: hidden; }
 }
 
 .dash-filter-btn {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   width: 100%;
   text-align: left;
   padding: 7px 10px;
@@ -3978,8 +3980,8 @@ select.blog-form-input option {
 }
 
 .dash-toolbar {
-  padding: 16px 24px;
-  background: #F7FAFF;
+  padding: 12px 24px;
+  background: #eaeff6;
   border-bottom: 1px solid rgba(0,0,0,0.07);
   flex-shrink: 0;
   display: flex;
@@ -3995,6 +3997,15 @@ select.blog-form-input option {
   gap: 8px;
   flex-wrap: wrap;
   flex: 1;
+}
+.dash-filter-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #7a8799;
+  white-space: nowrap;
+  margin-right: 4px;
 }
 .dash-filter-select {
   appearance: none;
