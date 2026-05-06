@@ -1161,7 +1161,7 @@ function showGraphTemplates() {
       </div>
       <div class="graph-gallery-info">
         ${lucideSVG('info', 16, 'currentColor')}
-        <span>Create a free <a href="https://www.datylon.com/" target="_blank" rel="noopener" class="graph-info-link">Datylon</a> account if you don't have one already. Each of the templates below need to be uploaded to your workspace once. You can do that via <strong>Workspace → Templates → Upload template</strong> in Datylon.</span>
+        <span>Create a free <a href="https://www.datylon.com/" target="_blank" rel="noopener" class="graph-info-link">Datylon</a> account if you don't have one already. Each of the templates below need to be uploaded to your workspace once. You can do that via <strong>Workspace → Templates → Upload template</strong> in Datylon. For more details, please download our <a href="/datylon/Datylon-Get-started.pdf" target="_blank" rel="noopener" class="graph-info-link">Get started with Datylon guide</a>.</span>
       </div>
       <div class="graph-series-toggle">
         <button class="graph-series-btn active" data-series="all">All</button>
