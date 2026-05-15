@@ -1,4 +1,4 @@
-// ABX PDF Builder — Dashboard view
+// GWI BlogLab — Dashboard view
 import { titlebarHTML, bindTitlebarEvents, syncTabs, updateTabName, patchTitlebarUser } from './titlebar.js'
 import { lucideSVG } from './lucide-icons.js'
 import { BRAND } from './brand.js'

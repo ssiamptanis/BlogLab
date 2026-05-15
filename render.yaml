@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: gwi-blog-thumbnail-creator
+    name: gwi-bloglab
     runtime: docker
     dockerfilePath: ./Dockerfile
     envVars:

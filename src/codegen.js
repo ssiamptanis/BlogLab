@@ -18,7 +18,7 @@ export function codeGen(blocks, meta = {}) {
 
   const lines = [
     '"""',
-    'ABX PDF Builder — generated script',
+    'GWI BlogLab — generated script',
     'Run: python3 this_file.py',
     '"""',
     'from builder import PDFBuilder',

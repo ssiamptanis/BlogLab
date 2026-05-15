@@ -1,5 +1,5 @@
 /**
- * Lucide icon utilities for ABX PDF Builder
+ * Lucide icon utilities for GWI BlogLab
  * Icons from https://lucide.dev — ISC licence
  */
 

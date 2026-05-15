@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// ABX PDF Builder App
+// GWI BlogLab App
 // ─────────────────────────────────────────────────────────────────────────────
 import html2canvas             from 'html2canvas'
 import { BlockEditor, cardSectionHTML } from './block-editor.js'

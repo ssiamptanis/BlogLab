@@ -1,4 +1,4 @@
-// ABX PDF Builder — router (History API)
+// GWI BlogLab — router (History API)
 import { renderApp }                                    from './app.js'
 import { renderDashboard, renderSettings, showTemplatePicker,
          preloadDashboard }                             from './dashboard.js'

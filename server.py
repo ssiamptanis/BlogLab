@@ -1,5 +1,5 @@
 """
-GWI Blog Thumbnail Creator — Flask backend
+GWI BlogLab — Flask backend
 Supabase-backed: templates, folders, and image uploads stored in Supabase.
 Auth: Supabase JWT validated on every /api/ route.
 """
@@ -1689,5 +1689,5 @@ def generate_talkdata_thumbnail():
 if __name__ == "__main__":
     # Railway sets PORT; fallback to FLASK_PORT for local dev
     port = int(os.environ.get("PORT", os.environ.get("FLASK_PORT", 5001)))
-    print(f"GWI Blog Thumbnail Creator — http://localhost:{port}")
+    print(f"GWI BlogLab — http://localhost:{port}")
     app.run(host="0.0.0.0", port=port, debug=False)

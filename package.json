@@ -1,7 +1,7 @@
 {
-  "name": "gwi-blog-thumbnail-creator",
+  "name": "gwi-bloglab",
   "version": "1.0.0",
-  "description": "GWI Blog Thumbnail Creator",
+  "description": "GWI BlogLab",
   "author": "Built by: Darragh O'Hagan",
   "type": "module",
   "scripts": {
