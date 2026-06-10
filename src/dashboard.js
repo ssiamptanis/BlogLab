@@ -17,7 +17,8 @@ let _navigate = null
 let _templates = []
 let _folders = []
 let _filter = 'mine'         // 'all' | 'mine' | 'saved' | 'draft'
-let _currentUserId = null   // set from Supabase session
+let _currentUserId    = null   // set from Supabase session
+let _currentUserEmail = null   // set from Supabase session
 let _activeFolderId = null   // null = show all folders
 let _showSettings = false    // settings panel open
 let _globalEventsRegistered = false
@@ -63,10 +64,11 @@ async function loadData() {
   ])
   _templates     = data.templates || []
   _folders       = data.folders   || []
-  // Capture current user ID for ownership checks
+  // Capture current user ID and email for ownership/feature checks
   if (!_currentUserId) {
     const { data: { session } } = await supabase.auth.getSession()
-    _currentUserId = session?.user?.id || null
+    _currentUserId    = session?.user?.id    || null
+    _currentUserEmail = session?.user?.email || null
   }
   // Remove any open tabs that refer to templates that no longer exist
   syncTabs(_templates.map(t => t.id))
@@ -616,6 +618,9 @@ const INFOGRAPHIC_PREVIEW = `<svg viewBox="0 0 200 283" fill="none" xmlns="http:
   <rect x="143" y="263" width="28" height="2.5" rx="1" fill="white" opacity="0.85"/>
 </svg>`
 
+// Emails with early access to features flagged comingSoon
+const EARLY_ACCESS_EMAILS = ['ssiamptanis@gwi.com']
+
 const TEMPLATE_TYPES = [
   {
     id: 'blog-thumbnail',
@@ -632,6 +637,15 @@ const TEMPLATE_TYPES = [
     preview: null,
     icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/></svg>`,
     blocks: []
+  },
+  {
+    id: 'social-media-post',
+    name: 'Social media post',
+    description: 'Design on-brand social media visuals for LinkedIn, Instagram, and more. Sized and styled for GWI\'s social channels.',
+    preview: null,
+    icon: `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2H3v16h5v4l4-4h5l4-4V2z"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="13" y2="13"/></svg>`,
+    blocks: [],
+    earlyAccess: true,
   },
 ]
 
@@ -835,17 +849,19 @@ export function showTemplatePicker(navigateFn) {
 
       <!-- Template cards -->
       <div class="tmpl-picker-grid">
-        ${TEMPLATE_TYPES.map(t => `
-          <button class="tmpl-picker-card ${t.comingSoon ? 'coming-soon' : ''}" data-type="${t.id}" ${t.comingSoon ? 'disabled' : ''}>
+        ${TEMPLATE_TYPES.map(t => {
+          const locked = t.earlyAccess && !EARLY_ACCESS_EMAILS.includes(_currentUserEmail)
+          return `
+          <button class="tmpl-picker-card ${locked ? 'coming-soon' : ''}" data-type="${t.id}" ${locked ? 'disabled' : ''}>
             <div class="tmpl-picker-card-icon">${t.icon}</div>
             <div class="tmpl-picker-eyebrow">${t.name}</div>
             <div class="tmpl-picker-desc">${t.description}</div>
             <div class="tmpl-picker-cta">
               ${lucideSVG('arrow-right', 14, 'currentColor')} Select this format
             </div>
-            ${t.comingSoon ? '<div class="tmpl-picker-soon">Coming soon</div>' : ''}
-          </button>
-        `).join('')}
+            ${locked ? '<div class="tmpl-picker-soon">Coming soon</div>' : ''}
+          </button>`
+        }).join('')}
       </div>
 
     </div>
