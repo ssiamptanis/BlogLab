@@ -4103,6 +4103,68 @@ select.blog-form-input option {
   flex-direction: column;
 }
 
+/* ── Social canvas (replaces grid when designing a social post) ── */
+.dash-main.social-mode .dash-toolbar {
+  display: none;
+}
+.social-canvas {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+  background-color: #0d0f14;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+  background-size: 28px 28px;
+  padding: 48px 40px 80px;
+}
+.social-canvas-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.social-artboard-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+.social-slide-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+}
+.social-artboard {
+  width: 400px;
+  aspect-ratio: 4 / 5;
+  background: #ffffff;
+  border-radius: 4px;
+  box-shadow: 0 4px 40px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+}
+.social-add-slide {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+  border: 1.5px dashed rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.5);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  margin-top: 4px;
+}
+.social-add-slide:hover {
+  background: rgba(255,0,119,0.12);
+  border-color: var(--pink);
+  color: var(--pink);
+}
+
 .dash-toolbar {
   padding: 12px 24px;
   background: #eaeff6;

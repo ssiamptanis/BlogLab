@@ -902,12 +902,14 @@ export function showTemplatePicker(navigateFn) {
 }
 
 // ── Social media creation panel ───────────────────────────────────────────────
-let _socialPostType = null  // 'single' | 'carousel' | null
+let _socialPostType = null   // 'single' | 'carousel' | null
+let _socialSlides   = [{}]   // array of slide objects; carousel grows as user adds
 
 function showSocialPanel() {
   const panel = _root.querySelector('#social-panel')
   if (!panel) return
   _socialPostType = null
+  _socialSlides   = [{}]
   panel.classList.add('open')
   _renderSocialPanel()
 }
@@ -917,6 +919,13 @@ function closeSocialPanel() {
   if (!panel) return
   panel.classList.remove('open')
   _socialPostType = null
+  _socialSlides   = [{}]
+  // Restore normal dashboard toolbar and grid
+  const main = _root.querySelector('.dash-main')
+  main?.classList.remove('social-mode')
+  const content = _root.querySelector('#dash-content')
+  if (content) content.innerHTML = gridHTML()
+  bindCardEvents()
 }
 
 function _renderSocialPanel() {
@@ -979,8 +988,50 @@ function _renderSocialPanel() {
   panel.querySelectorAll('.social-type-card').forEach(btn => {
     btn.addEventListener('click', () => {
       _socialPostType = btn.dataset.postType
+      _socialSlides   = [{}]
       _renderSocialPanel()
+      _renderSocialCanvas()
     })
+  })
+}
+
+function _renderSocialCanvas() {
+  const content = _root.querySelector('#dash-content')
+  const main    = _root.querySelector('.dash-main')
+  if (!content || !main) return
+
+  if (!_socialPostType) {
+    main.classList.remove('social-mode')
+    content.innerHTML = gridHTML()
+    bindCardEvents()
+    return
+  }
+
+  main.classList.add('social-mode')
+
+  const isCarousel = _socialPostType === 'carousel'
+
+  content.innerHTML = `
+    <div class="social-canvas">
+      <div class="social-canvas-stage">
+        ${_socialSlides.map((_, i) => `
+          <div class="social-artboard-wrap">
+            ${isCarousel ? `<div class="social-slide-label">Slide ${i + 1}</div>` : ''}
+            <div class="social-artboard" data-slide="${i}"></div>
+          </div>
+        `).join('')}
+        ${isCarousel ? `
+          <button class="social-add-slide" id="social-add-slide" title="Add slide">
+            ${lucideSVG('plus', 22, 'currentColor')}
+          </button>
+        ` : ''}
+      </div>
+    </div>
+  `
+
+  content.querySelector('#social-add-slide')?.addEventListener('click', () => {
+    _socialSlides.push({})
+    _renderSocialCanvas()
   })
 }
 
