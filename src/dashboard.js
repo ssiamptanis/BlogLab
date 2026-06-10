@@ -377,6 +377,9 @@ function renderDashboardHTML() {
           </div>
         </main>
 
+        <!-- Social media creation panel (slides in from right) -->
+        <aside class="social-panel" id="social-panel"></aside>
+
       </div>
     </div>
     <div class="toast"></div>
@@ -888,12 +891,97 @@ export function showTemplatePicker(navigateFn) {
         showBlogThumbnailForm()
       } else if (btn.dataset.type === 'graph') {
         showGraphTemplates()
+      } else if (btn.dataset.type === 'social-media-post') {
+        showSocialPanel()
       } else {
         await onNewTemplate(btn.dataset.type)
       }
     })
   })
 
+}
+
+// ── Social media creation panel ───────────────────────────────────────────────
+let _socialPostType = null  // 'single' | 'carousel' | null
+
+function showSocialPanel() {
+  const panel = _root.querySelector('#social-panel')
+  if (!panel) return
+  _socialPostType = null
+  panel.classList.add('open')
+  _renderSocialPanel()
+}
+
+function closeSocialPanel() {
+  const panel = _root.querySelector('#social-panel')
+  if (!panel) return
+  panel.classList.remove('open')
+  _socialPostType = null
+}
+
+function _renderSocialPanel() {
+  const panel = _root.querySelector('#social-panel')
+  if (!panel) return
+
+  panel.innerHTML = `
+    <div class="social-panel-inner">
+
+      <!-- Header -->
+      <div class="social-panel-header">
+        <div>
+          <div class="social-panel-eyebrow">New asset</div>
+          <h2 class="social-panel-title">Social media post</h2>
+        </div>
+        <button class="social-panel-close" id="social-panel-close">${lucideSVG('x', 16, 'currentColor')}</button>
+      </div>
+
+      <!-- Step: choose post type -->
+      <div class="social-panel-section">
+        <p class="social-panel-label">What type of post are you creating?</p>
+        <div class="social-type-cards">
+
+          <button class="social-type-card ${_socialPostType === 'single' ? 'active' : ''}" data-post-type="single">
+            <div class="social-type-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <path d="M21 15l-5-5L5 21"/>
+              </svg>
+            </div>
+            <div class="social-type-name">Single post</div>
+            <div class="social-type-desc">One image for Instagram or LinkedIn</div>
+          </button>
+
+          <button class="social-type-card ${_socialPostType === 'carousel' ? 'active' : ''}" data-post-type="carousel">
+            <div class="social-type-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="5" width="14" height="14" rx="2"/>
+                <path d="M8 3h14a2 2 0 0 1 2 2v14"/>
+                <path d="M18 11h-6"/>
+                <path d="M15 8l3 3-3 3"/>
+              </svg>
+            </div>
+            <div class="social-type-name">Carousel</div>
+            <div class="social-type-desc">A sequence of slides — great for step-by-step content</div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Placeholder for next steps — populated once post type is chosen -->
+      <div id="social-panel-steps"></div>
+
+    </div>
+  `
+
+  panel.querySelector('#social-panel-close').addEventListener('click', closeSocialPanel)
+
+  panel.querySelectorAll('.social-type-card').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _socialPostType = btn.dataset.postType
+      _renderSocialPanel()
+    })
+  })
 }
 
 function showSparkStatus(overlay, type, msg) {
