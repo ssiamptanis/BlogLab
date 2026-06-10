@@ -902,14 +902,16 @@ export function showTemplatePicker(navigateFn) {
 }
 
 // ── Social media creation panel ───────────────────────────────────────────────
-let _socialPostType = null   // 'single' | 'carousel' | null
-let _socialSlides   = [{}]   // array of slide objects; carousel grows as user adds
+let _socialPostType    = null   // 'single' | 'carousel' | null
+let _socialSlides      = [{}]   // array of slide objects { type: null }
+let _activeSocialSlide = null   // index of selected artboard, or null
 
 function showSocialPanel() {
   const panel = _root.querySelector('#social-panel')
   if (!panel) return
-  _socialPostType = null
-  _socialSlides   = [{}]
+  _socialPostType    = null
+  _socialSlides      = [{}]
+  _activeSocialSlide = null
   panel.classList.add('open')
   _renderSocialPanel()
 }
@@ -918,9 +920,9 @@ function closeSocialPanel() {
   const panel = _root.querySelector('#social-panel')
   if (!panel) return
   panel.classList.remove('open')
-  _socialPostType = null
-  _socialSlides   = [{}]
-  // Restore normal dashboard toolbar and grid
+  _socialPostType    = null
+  _socialSlides      = [{}]
+  _activeSocialSlide = null
   const main = _root.querySelector('.dash-main')
   main?.classList.remove('social-mode')
   const content = _root.querySelector('#dash-content')
@@ -928,9 +930,23 @@ function closeSocialPanel() {
   bindCardEvents()
 }
 
+const SOCIAL_TILE_TYPES = [
+  { id: 'cover',         label: 'Cover' },
+  { id: 'graph',         label: 'Graph' },
+  { id: 'stat',          label: 'Stat' },
+  { id: 'image-text',    label: 'Image + text' },
+  { id: 'call-to-action',label: 'Call to action' },
+]
+
 function _renderSocialPanel() {
   const panel = _root.querySelector('#social-panel')
   if (!panel) return
+
+  const activeSlide   = _activeSocialSlide !== null ? _socialSlides[_activeSocialSlide] : null
+  const isCarousel    = _socialPostType === 'carousel'
+  const tileLabel     = _activeSocialSlide !== null
+    ? (isCarousel ? `Tile ${_activeSocialSlide + 1}` : 'Post')
+    : null
 
   panel.innerHTML = `
     <div class="social-panel-inner">
@@ -944,9 +960,9 @@ function _renderSocialPanel() {
         <button class="social-panel-close" id="social-panel-close">${lucideSVG('x', 16, 'currentColor')}</button>
       </div>
 
-      <!-- Step: choose post type -->
+      <!-- Post format -->
       <div class="social-panel-section">
-        <p class="social-panel-label">What type of post are you creating?</p>
+        <p class="social-panel-label">Format</p>
         <div class="social-type-cards">
 
           <button class="social-type-card ${_socialPostType === 'single' ? 'active' : ''}" data-post-type="single">
@@ -957,8 +973,10 @@ function _renderSocialPanel() {
                 <path d="M21 15l-5-5L5 21"/>
               </svg>
             </div>
-            <div class="social-type-name">Single post</div>
-            <div class="social-type-desc">One image for Instagram or LinkedIn</div>
+            <div>
+              <div class="social-type-name">Single post</div>
+              <div class="social-type-desc">One image for Instagram or LinkedIn</div>
+            </div>
           </button>
 
           <button class="social-type-card ${_socialPostType === 'carousel' ? 'active' : ''}" data-post-type="carousel">
@@ -970,15 +988,42 @@ function _renderSocialPanel() {
                 <path d="M15 8l3 3-3 3"/>
               </svg>
             </div>
-            <div class="social-type-name">Carousel</div>
-            <div class="social-type-desc">A sequence of slides — great for step-by-step content</div>
+            <div>
+              <div class="social-type-name">Carousel</div>
+              <div class="social-type-desc">A sequence of tiles — great for step-by-step content</div>
+            </div>
           </button>
 
         </div>
       </div>
 
-      <!-- Placeholder for next steps — populated once post type is chosen -->
-      <div id="social-panel-steps"></div>
+      ${_socialPostType ? `
+        <!-- Divider -->
+        <div class="social-panel-divider"></div>
+
+        <!-- Tile settings — shown when an artboard is selected -->
+        ${activeSlide !== null ? `
+          <div class="social-panel-section">
+            <p class="social-panel-label">${tileLabel} settings</p>
+
+            <div class="social-panel-field">
+              <label class="social-panel-field-label" for="social-tile-type">Tile type</label>
+              <select class="social-panel-select" id="social-tile-type">
+                <option value="">— Select a type —</option>
+                ${SOCIAL_TILE_TYPES.map(t => `
+                  <option value="${t.id}" ${activeSlide.type === t.id ? 'selected' : ''}>${t.label}</option>
+                `).join('')}
+              </select>
+            </div>
+
+          </div>
+        ` : `
+          <div class="social-panel-hint">
+            ${lucideSVG('mouse-pointer-2', 14, 'currentColor')}
+            Click a tile to edit its settings
+          </div>
+        `}
+      ` : ''}
 
     </div>
   `
@@ -987,11 +1032,20 @@ function _renderSocialPanel() {
 
   panel.querySelectorAll('.social-type-card').forEach(btn => {
     btn.addEventListener('click', () => {
-      _socialPostType = btn.dataset.postType
-      _socialSlides   = [{}]
+      _socialPostType    = btn.dataset.postType
+      _socialSlides      = [{}]
+      _activeSocialSlide = null
       _renderSocialPanel()
       _renderSocialCanvas()
     })
+  })
+
+  panel.querySelector('#social-tile-type')?.addEventListener('change', e => {
+    if (_activeSocialSlide !== null) {
+      _socialSlides[_activeSocialSlide].type = e.target.value || null
+      // Re-render the active artboard to reflect the new type
+      _updateSocialArtboard(_activeSocialSlide)
+    }
   })
 }
 
@@ -1012,27 +1066,62 @@ function _renderSocialCanvas() {
   const isCarousel = _socialPostType === 'carousel'
 
   content.innerHTML = `
-    <div class="social-canvas">
+    <div class="social-canvas ${isCarousel ? 'social-canvas--carousel' : 'social-canvas--single'}">
       <div class="social-canvas-stage">
-        ${_socialSlides.map((_, i) => `
-          <div class="social-artboard-wrap">
-            ${isCarousel ? `<div class="social-slide-label">Slide ${i + 1}</div>` : ''}
-            <div class="social-artboard" data-slide="${i}"></div>
+        ${_socialSlides.map((slide, i) => `
+          <div class="social-artboard-wrap ${_activeSocialSlide === i ? 'active' : ''}" data-slide="${i}">
+            ${isCarousel ? `<div class="social-tile-label">Tile ${i + 1}</div>` : ''}
+            <div class="social-artboard" data-slide="${i}">
+              ${_socialArtboardContent(slide)}
+            </div>
           </div>
         `).join('')}
         ${isCarousel ? `
-          <button class="social-add-slide" id="social-add-slide" title="Add slide">
+          <button class="social-add-slide" id="social-add-slide" title="Add tile">
             ${lucideSVG('plus', 22, 'currentColor')}
+            <span>Add tile</span>
           </button>
         ` : ''}
       </div>
     </div>
   `
 
+  // Select artboard on click
+  content.querySelectorAll('.social-artboard-wrap').forEach(wrap => {
+    wrap.addEventListener('click', () => {
+      _activeSocialSlide = parseInt(wrap.dataset.slide, 10)
+      // Update active highlight on wraps
+      content.querySelectorAll('.social-artboard-wrap').forEach(w => {
+        w.classList.toggle('active', parseInt(w.dataset.slide, 10) === _activeSocialSlide)
+      })
+      _renderSocialPanel()
+    })
+  })
+
   content.querySelector('#social-add-slide')?.addEventListener('click', () => {
     _socialSlides.push({})
     _renderSocialCanvas()
   })
+}
+
+// Returns placeholder content for an artboard based on its type
+function _socialArtboardContent(slide) {
+  if (!slide.type) return ''
+  const labels = {
+    'cover':          'Cover',
+    'graph':          'Graph',
+    'stat':           'Stat',
+    'image-text':     'Image + text',
+    'call-to-action': 'Call to action',
+  }
+  return `<div class="social-artboard-placeholder">${labels[slide.type] || ''}</div>`
+}
+
+// Re-renders just the content inside one artboard without rebuilding the full canvas
+function _updateSocialArtboard(index) {
+  const artboard = _root.querySelector(`.social-artboard[data-slide="${index}"]`)
+  if (!artboard) return
+  artboard.innerHTML = _socialArtboardContent(_socialSlides[index])
 }
 
 function showSparkStatus(overlay, type, msg) {
